@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +21,40 @@ void fail(const char* format, ...) {
 
 FILE* src;
 
+// Character read from src using readRawCh or readCh. readRawCh reads the source character to ch
+// or 0 if all characters have been read (0 is not allowed in the source; reading more characters
+// after the end is an error). readCh calls readRawCh and repeats the calls until the read character
+// is not a space or newline.
+u8 ch = '?';
+
+// Store a history of read characters for better error messages on compilation errors.
+u8 chHistory[1024];
+size_t chHistoryPos = 0;
+
+void readRawCh() {
+    if(ch == 0) {
+        fail("TODO");
+    }
+    int val = fgetc(src);
+    if(val == EOF) {
+        ch = 0;
+        if(ferror(src)) {
+            fail("Reading the source file failed.");
+        }
+    } else {
+        ch = (u8)val;
+        chHistory[chHistoryPos++] = ch;
+        if(chHistoryPos == sizeof(chHistory)) {
+            chHistoryPos = 0;
+        }
+    }
+}
+void readCh() {
+    do {
+        readRawCh();
+    } while(ch == ' ' || ch == '\n');
+}
+
 const size_t memSize = (size_t)1 << 22;
 u8* memStart;
 u8* memEnd;
@@ -33,7 +68,6 @@ void initMem() {
 
     memEnd = memStart + memSize;
     memPos = memStart;
-
 
     // Initialize memory with randomness to help catch bugs early.
     FILE* rng = fopen("/dev/urandom", "rb");
@@ -71,18 +105,28 @@ u8* compile(u8* outString) {
     *memPos++ = 0xb8;
     memWritePtr(outString);
 
-    const char* string = "Hello, world!\n";
-    while(*string != '\0') {
-        u8 character = (u8)*string++;
+    while(1) {
+        readCh();
+        if(ch == 0) {
+            break;
+        }
 
-        // mov byte [eax], 'character': Write character to the current write position eax in the output string.
+        // mov byte [eax], 'ch': Write character to the current write position eax in the output string.
         *memPos++ = 0xc6;
         *memPos++ = 0x00;
-        *memPos++ = character;
+        *memPos++ = ch;
 
-        // inc eax: Increment current write position to the next byte.
+        // inc eax: Increment the current write position to the next byte.
         *memPos++ = 0x40;
     }
+
+    // mov byte [eax], 10: Write newline character to the output string.
+    *memPos++ = 0xc6;
+    *memPos++ = 0x00;
+    *memPos++ = 10;
+
+    // inc eax: Increment the current write position to the next byte.
+    *memPos++ = 0x40;
 
     // mov byte [eax], 0: Write the terminating zero byte to the output string.
     *memPos++ = 0xc6;
