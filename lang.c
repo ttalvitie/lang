@@ -52,6 +52,56 @@ void memWriteU32(u32 val) {
     memPos += 4;
 }
 
+u8* compile(u8* outString) {
+    // Write program code starting from memPos, which will be the entry point to the program.
+    u8* entryPoint = memPos;
+
+    // pushad: Save all registers to stack.
+    *memPos++ = 0x60;
+
+    // mov ebp, esp: Save the original stack pointer to ebp.
+    *memPos++ = 0x89;
+    *memPos++ = 0xE5;
+
+    // mov esp, 'memEnd': Move stack pointer to the end of the memory block.
+    *memPos++ = 0xBC;
+    memWritePtr(memEnd);
+
+    // mov eax, 'outString': Initialize eax to point to the beginning of the output string.
+    *memPos++ = 0xb8;
+    memWritePtr(outString);
+
+    const char* string = "Hello, world!\n";
+    while(*string != '\0') {
+        u8 character = (u8)*string++;
+
+        // mov byte [eax], 'character': Write character to the current write position eax in the output string.
+        *memPos++ = 0xc6;
+        *memPos++ = 0x00;
+        *memPos++ = character;
+
+        // inc eax: Increment current write position to the next byte.
+        *memPos++ = 0x40;
+    }
+
+    // mov byte [eax], 0: Write the terminating zero byte to the output string.
+    *memPos++ = 0xc6;
+    *memPos++ = 0x00;
+    *memPos++ = 0x00;
+
+    // mov esp, ebp: Restore original stack pointer used in the C program from ebp.
+    *memPos++ = 0x89;
+    *memPos++ = 0xEC;
+
+    // popad: Restore all registers from stack.
+    *memPos++ = 0x61;
+
+    // ret: Return to C program.
+    *memPos++ = 0xC3;
+
+    return entryPoint;
+}
+
 int main(int argc, char* argv[]) {
     if(argc != 2) {
         fail("Usage: ./lang <source>");
@@ -64,43 +114,25 @@ int main(int argc, char* argv[]) {
 
     initMem();
 
+    // The program will write the zero-terminated output string to the center of the memory.
+    u8* outString = memStart + memSize / 2;
+    *outString = 0;
+
+    u8* entryPoint = compile(outString);
+
     if(fclose(src) != 0) {
         fail("Closing the source file failed.");
     }
 
-    // pushad: Save all registers to stack.
-    *memPos++ = 0x60;
-
-    // mov ebp, esp: Save original stack pointer to ebp.
-    *memPos++ = 0x89;
-    *memPos++ = 0xE5;
-
-    // mov esp, 'memEnd': Move stack pointer to the end of the memory block.
-    *memPos++ = 0xBC;
-    memWritePtr(memEnd);
-
-    const u32 data = 0x1337CAFE;
-    // push 'data': Write data to stack.
-    *memPos++ = 0x68;
-    memWriteU32(data);
-
-    // mov esp, ebp: Restore original stack pointer used in the C program from ebp.
-    *memPos++ = 0x89;
-    *memPos++ = 0xEC;
-
-    // popad: Restore all registers from stack.
-    *memPos++ = 0x61;
-
-    // ret: Return to C program.
-    *memPos++ = 0xC3;
-
-    void (*func)() = (void(*)())memStart;
+    // Run the program.
+    void (*entryPointFunc)() = (void(*)())entryPoint;
     __builtin___clear_cache(memStart, memEnd);
-    func();
+    entryPointFunc();
 
-    u32 data2;
-    memcpy(&data2, memEnd - 4, 4);
-    printf("Stack data: %x\n", data2);
+    // Print the output string of the program.
+    while(*outString != 0) {
+        putchar((int)*outString++);
+    }
 
     return 0;
 }
