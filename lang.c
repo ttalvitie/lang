@@ -9,6 +9,13 @@
 typedef unsigned char u8;
 typedef unsigned int u32;
 
+// Store information about current line and column and previous characters for better error messages.
+u8 chHistory[128];
+size_t chHistoryPos = 0;
+int chLine = 1;
+int chColumn = 0;
+int chHistoryShowOnError = 0;
+
 void fail(const char* format, ...) {
     fprintf(stderr, "ERROR: ");
     va_list args;
@@ -16,6 +23,23 @@ void fail(const char* format, ...) {
     vfprintf(stderr, format, args);
     va_end(args);
     fprintf(stderr, "\n");
+    if(chHistoryShowOnError) {
+        fprintf(stderr, "Source line %d, column %d; previously read source:\n", chLine, chColumn);
+        fprintf(stderr, "------------------------------------------------------------\n");
+
+        for(size_t i = chHistoryPos; i < sizeof(chHistory); ++i) {
+            if(chHistory[i] != 0) {
+                fputc(chHistory[i], stderr);
+            }
+        }
+        for(size_t i = 0; i < chHistoryPos; ++i) {
+            if(chHistory[i] != 0) {
+                fputc(chHistory[i], stderr);
+            }
+        }
+
+        fprintf(stderr, "\n------------------------------------------------------------\n");
+    }
     exit(1);
 }
 
@@ -27,13 +51,9 @@ FILE* src;
 // is not a space or newline.
 u8 ch = '?';
 
-// Store a history of read characters for better error messages on compilation errors.
-u8 chHistory[1024];
-size_t chHistoryPos = 0;
-
 void readRawCh() {
     if(ch == 0) {
-        fail("TODO");
+        fail("Read past the end of the source file.");
     }
     int val = fgetc(src);
     if(val == EOF) {
@@ -47,6 +67,13 @@ void readRawCh() {
         if(chHistoryPos == sizeof(chHistory)) {
             chHistoryPos = 0;
         }
+        if(val == '\n') {
+            ++chLine;
+            chColumn = 0;
+        } else {
+            ++chColumn;
+        }
+        chHistoryShowOnError = 1;
     }
 }
 void readCh() {
@@ -163,6 +190,9 @@ int main(int argc, char* argv[]) {
     *outString = 0;
 
     u8* entryPoint = compile(outString);
+
+    // Compilation done; do not show source information in subsequent error messages.
+    chHistoryShowOnError = 0;
 
     if(fclose(src) != 0) {
         fail("Closing the source file failed.");
