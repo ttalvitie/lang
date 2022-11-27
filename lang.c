@@ -139,6 +139,8 @@ Name rootName;
 Name builtinNames[3];
 
 u8* compileMainFunc() {
+    // Create 
+
     u8* entryPoint = memPos;
 
     // TEST: call identity function
@@ -147,10 +149,10 @@ u8* compileMainFunc() {
     emitU8(0xA1);
     emitPtr(rootName.varBaseSlot);
 
-    // mov eax, [eax-'rootName.varOffset']
+    // mov eax, [eax+'rootName.varOffset']
     emitU8(0x8B);
     emitU8(0x80);
-    emitU32(-rootName.varOffset);
+    emitU32(rootName.varOffset);
 
     // push 'memStart + 10000'
     emitU8(0x68);
@@ -272,7 +274,7 @@ u8* emitBuiltins() {
     emitPtr(NULL);
 
     // Create a base pointer slot for builtin variables that contains its own address; thus we can
-    // reference the variables "" and "brk" with offsets 8 and 4, respectively.
+    // reference the variables "" and "brk" with offsets -8 and -4, respectively.
     u8* baseSlot = memPos;
     emitPtr(baseSlot);
 
@@ -288,9 +290,9 @@ u8* emitBuiltins() {
     builtinNames[2].hasVar = 1;
 
     rootName.varBaseSlot = baseSlot;
-    rootName.varOffset = 8;
+    rootName.varOffset = (u32)-8;
     builtinNames[2].varBaseSlot = baseSlot;
-    builtinNames[2].varOffset = 4;
+    builtinNames[2].varOffset = (u32)-4;
 
     rootName.successor = &builtinNames[0];
     builtinNames[0].successor = &builtinNames[1];
