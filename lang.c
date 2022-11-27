@@ -198,7 +198,7 @@ u8* emitEntryPointGlue() {
     // (The mainFunc address will be filled in after compiling the main function.)
     emitU8(0xB8);
     u8* mainFuncCallAddr = memPos;
-    memPos += 4;
+    emitPtr(NULL);
 
     // call eax: Call the main function.
     emitU8(0xFF);
@@ -263,7 +263,7 @@ u8* compile(u8* outString) {
     //   - "brk": The program break (pointer to the end of allocated memory).
     emitPtr(emitIdentityFunction());
     u8* brkSlot = memPos;
-    memPos += 4;
+    emitPtr(NULL);
     u8* baseSlot = memPos;
     emitPtr(baseSlot);
 
