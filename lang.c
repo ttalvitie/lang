@@ -103,20 +103,77 @@ void initMem() {
     }
 }
 
-void memWritePtr(void* ptr) {
-    memcpy(memPos, &ptr, 4);
+void writePtr(u8* dest, void* ptr) {
+    memcpy(dest, &ptr, 4);
+}
+
+void writeU32(u8* dest, u32 val) {
+    memcpy(dest, &val, 4);
+}
+
+void emitPtr(void* ptr) {
+    writePtr(memPos, ptr);
     memPos += 4;
 }
 
-void memWriteU32(u32 val) {
-    memcpy(memPos, &val, 4);
+void emitU32(u32 val) {
+    writeU32(memPos, val);
     memPos += 4;
 }
 
-u8* compile(u8* outString) {
-    // Write program code starting from memPos, which will be the entry point to the program.
+typedef struct Name Name;
+struct Name {
+    u8 lastCh;
+    u8 hasVar;
+    u8* varBaseSlot;
+    u32 varOffset;
+    Name* successor;
+    Name* neighbor;
+};
+Name rootName;
+
+// Compile TODO
+u8* compileFuncBody(u8 endCh) {
     u8* entryPoint = memPos;
 
+    // TEST: call identity function
+
+    // mov eax, ['rootName.varBaseSlot']
+    *memPos++ = 0xA1;
+    emitPtr(rootName.varBaseSlot);
+
+    // mov eax, [eax-'rootName.varOffset']
+    *memPos++ = 0x8B;
+    *memPos++ = 0x80;
+    emitU32(-rootName.varOffset);
+
+    // push 'memStart + 10000'
+    *memPos++ = 0x68;
+    emitPtr(memStart + 10000);
+
+    // push 0x13371337
+    *memPos++ = 0x68;
+    emitU32(0x13371337);
+
+    // push 2
+    *memPos++ = 0x6A;
+    *memPos++ = 0x02;
+
+    // call eax
+    *memPos++ = 0xFF;
+    *memPos++ = 0xD0;
+
+    // ret: Return from the function.
+    *memPos++ = 0xC3;
+
+    return entryPoint;
+}
+
+// Emit the main program entry point code that can be called from the C program and will run the
+// main function of the program. The entry point of the emitted code is memPos prior to calling
+// this function. The return value is the pointer to the slot in the emitted code where the
+// address of the main function should be written to.
+u8* emitEntryPointGlue() {
     // pushad: Save all registers to stack.
     *memPos++ = 0x60;
 
@@ -124,41 +181,23 @@ u8* compile(u8* outString) {
     *memPos++ = 0x89;
     *memPos++ = 0xE5;
 
-    // mov esp, 'memEnd': Move stack pointer to the end of the memory block.
+    // mov esp, 'memEnd': Move the stack pointer to the end of the memory block.
     *memPos++ = 0xBC;
-    memWritePtr(memEnd);
+    emitPtr(memEnd);
 
-    // mov eax, 'outString': Initialize eax to point to the beginning of the output string.
-    *memPos++ = 0xb8;
-    memWritePtr(outString);
-
-    while(1) {
-        readCh();
-        if(ch == 0) {
-            break;
-        }
-
-        // mov byte [eax], 'ch': Write character to the current write position eax in the output string.
-        *memPos++ = 0xc6;
-        *memPos++ = 0x00;
-        *memPos++ = ch;
-
-        // inc eax: Increment the current write position to the next byte.
-        *memPos++ = 0x40;
-    }
-
-    // mov byte [eax], 10: Write newline character to the output string.
-    *memPos++ = 0xc6;
+    // push 0: Push the length of the argument list for the main function (zero) to the stack.
+    *memPos++ = 0x6A;
     *memPos++ = 0x00;
-    *memPos++ = 10;
 
-    // inc eax: Increment the current write position to the next byte.
-    *memPos++ = 0x40;
+    // mov eax 'mainFunc': Write the address of the main function to eax.
+    // (The mainFunc address will be filled in after compiling the main function.)
+    *memPos++ = 0xB8;
+    u8* mainFuncCallAddr = memPos;
+    memPos += 4;
 
-    // mov byte [eax], 0: Write the terminating zero byte to the output string.
-    *memPos++ = 0xc6;
-    *memPos++ = 0x00;
-    *memPos++ = 0x00;
+    // call eax: Call the main function.
+    *memPos++ = 0xFF;
+    *memPos++ = 0xD0;
 
     // mov esp, ebp: Restore original stack pointer used in the C program from ebp.
     *memPos++ = 0x89;
@@ -167,8 +206,99 @@ u8* compile(u8* outString) {
     // popad: Restore all registers from stack.
     *memPos++ = 0x61;
 
-    // ret: Return to C program.
+    // ret: Return to the C program.
     *memPos++ = 0xC3;
+
+    return mainFuncCallAddr;
+}
+
+// Emit the identity function (32-bit write) implementation; return the function pointer to it.
+u8* emitIdentityFunction() {
+    u8* entryPoint = memPos;
+
+    // pop eax: Pop the return address from the stack to eax.
+    *memPos++ = 0x58;
+
+    // pop ebx: Pop the number of arguments from the stack to ebx.
+    *memPos++ = 0x5B;
+
+    // cmp ebx, 2: Compare the number of arguments to 2.
+    *memPos++ = 0x83;
+    *memPos++ = 0xFB;
+    *memPos++ = 0x02;
+
+    // x: jne x: If the number of arguments is not 2, loop infinitely. (TODO: Better error handling)
+    *memPos++ = 0x75;
+    *memPos++ = 0xFE;
+
+    // pop ecx: Read the second argument (the value) to ecx.
+    *memPos++ = 0x59;
+
+    // pop ebx: Read the first argument (the output pointer) to ebx.
+    *memPos++ = 0x5B;
+
+    // mov [ebx], ecx: Write the value to the output.
+    *memPos++ = 0x89;
+    *memPos++ = 0x0B;
+
+    // jmp eax: Return from the function.
+    *memPos++ = 0xFF;
+    *memPos++ = 0xE0;
+
+    return entryPoint;
+}
+
+u8* compile(u8* outString) {
+    // Emit glue code that will forward the call from the C program to our compiled main function.
+    u8* entryPoint = memPos;
+    u8* mainFuncCallAddr = emitEntryPointGlue();
+
+    // Initialize the name trie with two names:
+    //   - "": The identity function (32-bit write).
+    //   - "brk": The program break (pointer to the end of allocated memory).
+    emitPtr(emitIdentityFunction());
+    u8* brkSlot = memPos;
+    memPos += 4;
+    u8* baseSlot = memPos;
+    emitPtr(baseSlot);
+
+    Name name1, name2, brkName;
+
+    rootName.lastCh = 0;
+    name1.lastCh = 'b';
+    name2.lastCh = 'r';
+    brkName.lastCh = 'k';
+
+    rootName.hasVar = 1;
+    rootName.varBaseSlot = baseSlot;
+    rootName.varOffset = 8;
+    brkName.hasVar = 1;
+    brkName.varBaseSlot = baseSlot;
+    brkName.varOffset = 4;
+
+    name1.hasVar = 0;
+    name2.hasVar = 0;
+
+    rootName.successor = &name1;
+    name1.successor = &name2;
+    name2.successor = &brkName;
+    brkName.successor = NULL;
+
+    rootName.neighbor = NULL;
+    name1.neighbor = NULL;
+    name2.neighbor = NULL;
+    brkName.neighbor = NULL;
+
+    // Compile the source code as the main function (a function body that ends in 0, that is, the
+    // end of the file).
+    readCh();
+    u8* mainFunc = compileFuncBody(0);
+
+    // Fill in the address to the main function call in the entry point glue code.
+    writePtr(mainFuncCallAddr, mainFunc);
+
+    // Fill in the initial program break position.
+    writePtr(brkSlot, memPos);
 
     return entryPoint;
 }
@@ -207,6 +337,9 @@ int main(int argc, char* argv[]) {
     while(*outString != 0) {
         putchar((int)*outString++);
     }
+
+    // TEST
+    printf("%x\n", *(u32*)(memStart + 10000));
 
     return 0;
 }
