@@ -138,8 +138,7 @@ struct Name {
 Name rootName;
 Name builtinNames[3];
 
-// Compile TODO
-u8* compileFuncBody(u8 endCh) {
+u8* compileMainFunc() {
     u8* entryPoint = memPos;
 
     // TEST: call identity function
@@ -306,7 +305,7 @@ u8* emitBuiltins() {
     return brkSlot;
 }
 
-u8* compile(u8* outString) {
+u8* compile() {
     // Emit glue code that will forward the call from the C program to our compiled main function.
     u8* entryPoint = memPos;
     u8* mainFuncCallAddr = emitEntryPointGlue();
@@ -316,8 +315,7 @@ u8* compile(u8* outString) {
 
     // Compile the source code as the main function (a function body that ends in 0, that is, the
     // end of the file).
-    readCh();
-    u8* mainFunc = compileFuncBody(0);
+    u8* mainFunc = compileMainFunc();
 
     // Fill in the address to the main function call in the entry point glue code.
     writePtr(mainFuncCallAddr, mainFunc);
@@ -344,7 +342,7 @@ int main(int argc, char* argv[]) {
     u8* outString = memStart + memSize / 2;
     *outString = 0;
 
-    u8* entryPoint = compile(outString);
+    u8* entryPoint = compile();
 
     // Compilation done; do not show source information in subsequent error messages.
     chHistoryShowOnError = 0;
