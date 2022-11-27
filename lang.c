@@ -138,40 +138,46 @@ struct Name {
 Name rootName;
 Name builtinNames[3];
 
-u8* compileMainFunc() {
-    // Create 
+u8* compileFuncBody(u32 argCount, u8 endCh) {
+    // Create a base pointer slot for the main function.
+    u8* baseSlot = memPos;
+    emitPtr(NULL);
 
+    // Start emitting the function implementation.
     u8* entryPoint = memPos;
 
-    // TEST: call identity function
+    // cmp dword [esp+4], 'argCount': Compare the number of arguments from stack to 'argCount'.
+    emitU8(0x81);
+    emitU8(0x7C);
+    emitU8(0x24);
+    emitU8(0x04);
+    emitU32(argCount);
 
-    // mov eax, ['rootName.varBaseSlot']
-    emitU8(0xA1);
-    emitPtr(rootName.varBaseSlot);
+    // x: jne x: If the number of arguments is not 'argCount', loop infinitely. (TODO: Better error handling)
+    emitU8(0x75);
+    emitU8(0xFE);
 
-    // mov eax, [eax+'rootName.varOffset']
+    // mov ['baseSlot'], esp: Save the base pointer (stack pointer esp) to the base slot.
+    emitU8(0x89);
+    emitU8(0x25);
+    emitPtr(baseSlot);
+
+    // mov esp, ['baseSlot']: Move the stack pointer to its original position, discarding local variables.
     emitU8(0x8B);
-    emitU8(0x80);
-    emitU32(rootName.varOffset);
+    emitU8(0x25);
+    emitPtr(baseSlot);
 
-    // push 'memStart + 10000'
-    emitU8(0x68);
-    emitPtr(memStart + 10000);
+    // pop eax: Pop the return address from the top of the stack to eax.
+    emitU8(0x58);
 
-    // push 0x13371337
-    emitU8(0x68);
-    emitU32(0x13371337);
+    // add esp, '4 * (argCount + 1)': Discard the arguments and the number of arguments from the stack.
+    emitU8(0x81);
+    emitU8(0xC4);
+    emitU32(4 * (argCount + 1));
 
-    // push 2
-    emitU8(0x6A);
-    emitU8(0x02);
-
-    // call eax
+    // jmp eax: Return from the function by jumping to the return address stored in eax.
     emitU8(0xFF);
-    emitU8(0xD0);
-
-    // ret: Return from the function.
-    emitU8(0xC3);
+    emitU8(0xE0);
 
     return entryPoint;
 }
@@ -248,7 +254,7 @@ u8* emitIdentityFunction() {
     emitU8(0x89);
     emitU8(0x0B);
 
-    // jmp eax: Return from the function.
+    // jmp eax: Return from the function by jumping to the return address stored in eax.
     emitU8(0xFF);
     emitU8(0xE0);
 
@@ -317,7 +323,8 @@ u8* compile() {
 
     // Compile the source code as the main function (a function body that ends in 0, that is, the
     // end of the file).
-    u8* mainFunc = compileMainFunc();
+    readCh();
+    u8* mainFunc = compileFuncBody(0, 0);
 
     // Fill in the address to the main function call in the entry point glue code.
     writePtr(mainFuncCallAddr, mainFunc);
