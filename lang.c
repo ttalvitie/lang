@@ -106,7 +106,9 @@ void initMem() {
 void writePtr(u8* dest, void* ptr) {
     memcpy(dest, &ptr, 4);
 }
-
+void writeU8(u8* dest, u8 val) {
+    *dest = val;
+}
 void writeU32(u8* dest, u32 val) {
     memcpy(dest, &val, 4);
 }
@@ -115,7 +117,10 @@ void emitPtr(void* ptr) {
     writePtr(memPos, ptr);
     memPos += 4;
 }
-
+void emitU8(u8 val) {
+    writeU8(memPos, val);
+    memPos += 1;
+}
 void emitU32(u32 val) {
     writeU32(memPos, val);
     memPos += 4;
@@ -139,32 +144,32 @@ u8* compileFuncBody(u8 endCh) {
     // TEST: call identity function
 
     // mov eax, ['rootName.varBaseSlot']
-    *memPos++ = 0xA1;
+    emitU8(0xA1);
     emitPtr(rootName.varBaseSlot);
 
     // mov eax, [eax-'rootName.varOffset']
-    *memPos++ = 0x8B;
-    *memPos++ = 0x80;
+    emitU8(0x8B);
+    emitU8(0x80);
     emitU32(-rootName.varOffset);
 
     // push 'memStart + 10000'
-    *memPos++ = 0x68;
+    emitU8(0x68);
     emitPtr(memStart + 10000);
 
     // push 0x13371337
-    *memPos++ = 0x68;
+    emitU8(0x68);
     emitU32(0x13371337);
 
     // push 2
-    *memPos++ = 0x6A;
-    *memPos++ = 0x02;
+    emitU8(0x6A);
+    emitU8(0x02);
 
     // call eax
-    *memPos++ = 0xFF;
-    *memPos++ = 0xD0;
+    emitU8(0xFF);
+    emitU8(0xD0);
 
     // ret: Return from the function.
-    *memPos++ = 0xC3;
+    emitU8(0xC3);
 
     return entryPoint;
 }
@@ -175,39 +180,39 @@ u8* compileFuncBody(u8 endCh) {
 // address of the main function should be written to.
 u8* emitEntryPointGlue() {
     // pushad: Save all registers to stack.
-    *memPos++ = 0x60;
+    emitU8(0x60);
 
     // mov ebp, esp: Save the original stack pointer to ebp.
-    *memPos++ = 0x89;
-    *memPos++ = 0xE5;
+    emitU8(0x89);
+    emitU8(0xE5);
 
     // mov esp, 'memEnd': Move the stack pointer to the end of the memory block.
-    *memPos++ = 0xBC;
+    emitU8(0xBC);
     emitPtr(memEnd);
 
     // push 0: Push the length of the argument list for the main function (zero) to the stack.
-    *memPos++ = 0x6A;
-    *memPos++ = 0x00;
+    emitU8(0x6A);
+    emitU8(0x00);
 
     // mov eax 'mainFunc': Write the address of the main function to eax.
     // (The mainFunc address will be filled in after compiling the main function.)
-    *memPos++ = 0xB8;
+    emitU8(0xB8);
     u8* mainFuncCallAddr = memPos;
     memPos += 4;
 
     // call eax: Call the main function.
-    *memPos++ = 0xFF;
-    *memPos++ = 0xD0;
+    emitU8(0xFF);
+    emitU8(0xD0);
 
     // mov esp, ebp: Restore original stack pointer used in the C program from ebp.
-    *memPos++ = 0x89;
-    *memPos++ = 0xEC;
+    emitU8(0x89);
+    emitU8(0xEC);
 
     // popad: Restore all registers from stack.
-    *memPos++ = 0x61;
+    emitU8(0x61);
 
     // ret: Return to the C program.
-    *memPos++ = 0xC3;
+    emitU8(0xC3);
 
     return mainFuncCallAddr;
 }
@@ -217,33 +222,33 @@ u8* emitIdentityFunction() {
     u8* entryPoint = memPos;
 
     // pop eax: Pop the return address from the stack to eax.
-    *memPos++ = 0x58;
+    emitU8(0x58);
 
     // pop ebx: Pop the number of arguments from the stack to ebx.
-    *memPos++ = 0x5B;
+    emitU8(0x5B);
 
     // cmp ebx, 2: Compare the number of arguments to 2.
-    *memPos++ = 0x83;
-    *memPos++ = 0xFB;
-    *memPos++ = 0x02;
+    emitU8(0x83);
+    emitU8(0xFB);
+    emitU8(0x02);
 
     // x: jne x: If the number of arguments is not 2, loop infinitely. (TODO: Better error handling)
-    *memPos++ = 0x75;
-    *memPos++ = 0xFE;
+    emitU8(0x75);
+    emitU8(0xFE);
 
     // pop ecx: Read the second argument (the value) to ecx.
-    *memPos++ = 0x59;
+    emitU8(0x59);
 
     // pop ebx: Read the first argument (the output pointer) to ebx.
-    *memPos++ = 0x5B;
+    emitU8(0x5B);
 
     // mov [ebx], ecx: Write the value to the output.
-    *memPos++ = 0x89;
-    *memPos++ = 0x0B;
+    emitU8(0x89);
+    emitU8(0x0B);
 
     // jmp eax: Return from the function.
-    *memPos++ = 0xFF;
-    *memPos++ = 0xE0;
+    emitU8(0xFF);
+    emitU8(0xE0);
 
     return entryPoint;
 }
