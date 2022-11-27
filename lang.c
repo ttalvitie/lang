@@ -136,6 +136,7 @@ struct Name {
     Name* neighbor;
 };
 Name rootName;
+Name builtinNames[3];
 
 // Compile TODO
 u8* compileFuncBody(u8 endCh) {
@@ -253,46 +254,65 @@ u8* emitIdentityFunction() {
     return entryPoint;
 }
 
+// Emits builtin variables/functions:
+//   - "": The identity function (32-bit write).
+//   - "brk": The program break (pointer to the end of allocated memory).
+// Initializes the name trie under rootName to contain them.
+// Returns a pointer to the brk variable where the correct value should be written once it is known.
+u8* emitBuiltins() {
+    // Emit identity function implementation.
+    u8* identityFunc = emitIdentityFunction();
+
+    // Emit the variables:
+
+    // The identity function variable contains the address of the implementation.
+    emitPtr(identityFunc);
+
+    // Set brk to NULL for now; it will be overwritten by the caller later.
+    u8* brkSlot = memPos;
+    emitPtr(NULL);
+
+    // Create a base pointer slot for builtin variables that contains its own address; thus we can
+    // reference the variables "" and "brk" with offsets 8 and 4, respectively.
+    u8* baseSlot = memPos;
+    emitPtr(baseSlot);
+
+    // Initialize the name trie.
+    rootName.lastCh = 0;
+    builtinNames[0].lastCh = 'b';
+    builtinNames[1].lastCh = 'r';
+    builtinNames[2].lastCh = 'k';
+
+    rootName.hasVar = 1;
+    builtinNames[0].hasVar = 0;
+    builtinNames[1].hasVar = 0;
+    builtinNames[2].hasVar = 1;
+
+    rootName.varBaseSlot = baseSlot;
+    rootName.varOffset = 8;
+    builtinNames[2].varBaseSlot = baseSlot;
+    builtinNames[2].varOffset = 4;
+
+    rootName.successor = &builtinNames[0];
+    builtinNames[0].successor = &builtinNames[1];
+    builtinNames[1].successor = &builtinNames[2];
+    builtinNames[2].successor = NULL;
+
+    rootName.neighbor = NULL;
+    builtinNames[0].neighbor = NULL;
+    builtinNames[1].neighbor = NULL;
+    builtinNames[2].neighbor = NULL;
+
+    return brkSlot;
+}
+
 u8* compile(u8* outString) {
     // Emit glue code that will forward the call from the C program to our compiled main function.
     u8* entryPoint = memPos;
     u8* mainFuncCallAddr = emitEntryPointGlue();
 
-    // Initialize the name trie with two names:
-    //   - "": The identity function (32-bit write).
-    //   - "brk": The program break (pointer to the end of allocated memory).
-    emitPtr(emitIdentityFunction());
-    u8* brkSlot = memPos;
-    emitPtr(NULL);
-    u8* baseSlot = memPos;
-    emitPtr(baseSlot);
-
-    Name name1, name2, brkName;
-
-    rootName.lastCh = 0;
-    name1.lastCh = 'b';
-    name2.lastCh = 'r';
-    brkName.lastCh = 'k';
-
-    rootName.hasVar = 1;
-    rootName.varBaseSlot = baseSlot;
-    rootName.varOffset = 8;
-    brkName.hasVar = 1;
-    brkName.varBaseSlot = baseSlot;
-    brkName.varOffset = 4;
-
-    name1.hasVar = 0;
-    name2.hasVar = 0;
-
-    rootName.successor = &name1;
-    name1.successor = &name2;
-    name2.successor = &brkName;
-    brkName.successor = NULL;
-
-    rootName.neighbor = NULL;
-    name1.neighbor = NULL;
-    name2.neighbor = NULL;
-    brkName.neighbor = NULL;
+    // Emit data and initialize name trie for builtin variables.
+    u8* brkSlot = emitBuiltins();
 
     // Compile the source code as the main function (a function body that ends in 0, that is, the
     // end of the file).
