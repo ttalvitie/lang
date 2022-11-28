@@ -138,11 +138,12 @@ struct Name {
 Name rootName;
 Name builtinNames[3];
 
-u8* compileFuncBody(u32 argCount, u8 endCh) {
-    // Create a base pointer slot for the main function.
-    u8* baseSlot = memPos;
-    emitPtr(NULL);
-
+// Compile the function body for function with given argCount arguments whose implementation source
+// code ends in the character endCh (typically '}', but 0 for main the function as it ends in the
+// end of the source code). baseSlot should be the location where the function can store its stack
+// base pointer upon being called.
+// Discards the current character; stops reading after reading the end character.
+u8* compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh) {
     // Start emitting the function implementation.
     u8* entryPoint = memPos;
 
@@ -180,6 +181,15 @@ u8* compileFuncBody(u32 argCount, u8 endCh) {
     emitU8(0xE0);
 
     return entryPoint;
+}
+
+u8* compileMainFunc() {
+    // Create a base pointer slot for the main function.
+    u8* baseSlot = memPos;
+    emitPtr(NULL);
+
+    // Compile the main function as a function body that ends at the end of the file (character 0).
+    return compileFuncBody(baseSlot, 0, 0);
 }
 
 // Emit the main program entry point code that can be called from the C program and will run the
@@ -323,8 +333,7 @@ u8* compile() {
 
     // Compile the source code as the main function (a function body that ends in 0, that is, the
     // end of the file).
-    readCh();
-    u8* mainFunc = compileFuncBody(0, 0);
+    u8* mainFunc = compileMainFunc();
 
     // Fill in the address to the main function call in the entry point glue code.
     writePtr(mainFuncCallAddr, mainFunc);
