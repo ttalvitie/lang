@@ -158,14 +158,24 @@ u8* compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh) {
     emitU8(0x75);
     emitU8(0xFE);
 
+    // push dword ['baseSlot']: Push the base pointer of the upper recursive call of this function to the stack.
+    emitU8(0xFF);
+    emitU8(0x35);
+    emitPtr(baseSlot);
+
     // mov ['baseSlot'], esp: Save the base pointer (stack pointer esp) to the base slot.
     emitU8(0x89);
     emitU8(0x25);
     emitPtr(baseSlot);
 
-    // mov esp, ['baseSlot']: Move the stack pointer to its original position, discarding local variables.
+    // mov esp, ['baseSlot']: Move the stack pointer to the base pointer position, discarding local variables.
     emitU8(0x8B);
     emitU8(0x25);
+    emitPtr(baseSlot);
+
+    // pop dword ['baseSlot']: Restore the base pointer of the upper recursive call of this function from the stack.
+    emitU8(0x8F);
+    emitU8(0x05);
     emitPtr(baseSlot);
 
     // pop eax: Pop the return address from the top of the stack to eax.
