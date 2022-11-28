@@ -178,33 +178,97 @@ int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
 // Helper function of compileFuncBody that compiles the actual variable creations and function
 // calls. Uses recursion to allocate name trie nodes from the stack for new variables.
 // The argument 'name' is the partially read new variable name (&rootName if none).
+// If 'isAssignment' is nonzero, then we are currently reading a function call whose result is
+// assigned to address in eax (that is, the first argument to the call is eax).
 // The 'var*' arguments specify the base pointer slot and offset for creating new variables.
-void compileFuncBodyImpl(Name* name, u8* varBaseSlot, u32 varOffset, u8 endCh) {
-    readCh();
-    if(ch == endCh) {
-        if(name != &rootName) {
-            fail("Unexpected end of a function body");
+void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varOffset, u8 endCh) {
+    while(1) {
+        readCh();
+        if(ch == endCh) {
+            if(name != &rootName) {
+                fail("Unexpected end of a function body");
+            }
+            return;
         }
-        return;
-    }
 
-    Name newNameNode;
-    Name** nameLink;
+        if(ch != '(' && ch != ':' && ch != '=') {
+            Name newNameNode;
+            Name** nameLink;
+            if(extendName(ch, &name, &newNameNode, &nameLink)) {
+                continue;
+            } else {
+                // newNameNode is now part of the trie, so to persist it we need to recurse.
+                compileFuncBodyImpl(name, isAssignment, varBaseSlot, varOffset, endCh);
 
-    while(ch != '(' && ch != ':' && ch != '=') {
-        if(!extendName(ch, &name, &newNameNode, &nameLink)) {
-            // newNameNode is now part of the trie, so to persist it we need to recurse.
-            compileFuncBodyImpl(name, varBaseSlot, varOffset, endCh);
+                // After the recursive call, the function body has been compiled, and all local
+                // variables are out of scope, so we can remove the node from the trie.
+                *nameLink = NULL;
+
+                return;
+            }
+        }
+
+        if(isAssignment && ch != '(') {
+            fail("Assignment to multiple variables is not supported");
+        }
+
+        if(ch == ':') {
+            // Variable creation ':'.
+            if(name->hasVar) {
+                fail("A variable with the same name already exists");
+            }
+
+            // Add information about the new variable to the trie.
+            name->hasVar = 1;
+            name->varBaseSlot = varBaseSlot;
+            varOffset -= 4;
+            name->varOffset = varOffset;
+
+            // push 0: Reserve space for the variable in the stack and initialize it to 0.
+            emitU8(0x6A);
+            emitU8(0x00);
+
+            // mov eax, esp: Save the address of the new variable to eax.
+            emitU8(0x89);
+            emitU8(0xE0);
+
+            // Compile the function call and the remainder of the body in a recursive call, using
+            // isAssignment = 1 to enable the assignment.
+            compileFuncBodyImpl(&rootName, 1, varBaseSlot, varOffset, endCh);
 
             // After the recursive call, the function body has been compiled, and all local
-            // variables are out of scope, so we can remove the node from the trie.
-            *nameLink = NULL;
+            // variables are out of scope, so we can remove the created variable.
+            name->hasVar = 0;
 
             return;
         }
-    }
 
-    // TODO
+        // Variable assignment '=' or function call '('.
+        if(!name->hasVar) {
+            fail("Variable with given name does not exist");
+        }
+
+        if(ch == '=') {
+            // Variable assignment '='.
+
+            // mov eax, ['name->varBaseSlot']: Copy the base pointer of the variable to eax.
+            emitU8(0xA1);
+            emitPtr(name->varBaseSlot);
+
+            // add eax, 'name->varOffset': Apply the variable offset to eax so that eax points to the variable.
+            emitU8(0x05);
+            emitU32(name->varOffset);
+
+            // Compile the function call and the remainder of the body, using isAssignment = 1 to
+            // enable the assignment.
+            name = &rootName;
+            isAssignment = 1;
+            continue;
+        }
+
+        // Function call '('.
+        fail("Function call with isAssignment = %d, TODO implement", isAssignment);
+    }
 }
 
 // Compile the function body for function with given argCount arguments whose implementation source
@@ -238,7 +302,7 @@ u8* compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh) {
     emitPtr(baseSlot);
 
     // Compile the actual function content.
-    compileFuncBodyImpl(&rootName, baseSlot, 0, endCh);
+    compileFuncBodyImpl(&rootName, 0, baseSlot, 0, endCh);
 
     // mov esp, ['baseSlot']: Move the stack pointer to the base pointer position, discarding local variables.
     emitU8(0x8B);
