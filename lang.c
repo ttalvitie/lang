@@ -126,17 +126,86 @@ void emitU32(u32 val) {
     memPos += 4;
 }
 
+// Trie structure containing variable names.
 typedef struct Name Name;
 struct Name {
+    // Last character in the name so far.
     u8 lastCh;
+
+    // If this node contains a variable, 'hasVar' is nonzero, and the variable is located in address
+    // *varBaseSlot + varOffset.
     u8 hasVar;
     u8* varBaseSlot;
     u32 varOffset;
+
+    // The trie structure: 'successor' is a child node (if not NULL), and the children form a singly
+    // linked list using the 'neighbor' fields as links (NULL marks the end of the list).
     Name* successor;
     Name* neighbor;
 };
 Name rootName;
 Name builtinNames[3];
+
+// Advance *name in the name trie by appending 'newCh' to the end of the name. If this can be done
+// using the existing nodes, updates *name and returns 1. Otherwise, returns 0 and if 'newNode' is
+// not NULL, adds it to the trie and points *name to it, and sets *link to point to the
+// successor/neighbor pointer in the trie that points to the added node (the node can be removed
+// by setting **link to NULL; this should only be done after all nodes that have been added after
+// adding this node have already been removed). If newNode is added to the trie, it is initialized
+// to contain no variable.
+int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
+    Name** linkCand = &(*name)->successor;
+    while(*linkCand != NULL && (*linkCand)->lastCh != newCh) {
+        linkCand = &(*linkCand)->neighbor;
+    }
+    if(*linkCand != NULL && (*linkCand)->lastCh == newCh) {
+        *name = *linkCand;
+        return 1;
+    } else {
+        if(newNode != NULL) {
+            *link = linkCand;
+            *linkCand = newNode;
+            *name = newNode;
+            newNode->lastCh = newCh;
+            newNode->hasVar = 0;
+            newNode->successor = NULL;
+            newNode->neighbor = NULL;
+        }
+        return 0;
+    }
+}
+
+// Helper function of compileFuncBody that compiles the actual variable creations and function
+// calls. Uses recursion to allocate name trie nodes from the stack for new variables.
+// The argument 'name' is the partially read new variable name (&rootName if none).
+// The 'var*' arguments specify the base pointer slot and offset for creating new variables.
+void compileFuncBodyImpl(Name* name, u8* varBaseSlot, u32 varOffset, u8 endCh) {
+    readCh();
+    if(ch == endCh) {
+        if(name != &rootName) {
+            fail("Unexpected end of a function body");
+        }
+        return;
+    }
+
+    Name newNameNode;
+    Name** nameLink;
+
+    while(ch != '(' && ch != ':' && ch != '=') {
+        if(!extendName(ch, &name, &newNameNode, &nameLink)) {
+            // newNameNode is now part of the trie, so to persist it we need to recurse.
+            compileFuncBodyImpl(name, varBaseSlot, varOffset, endCh);
+
+            // After the recursive call, the function body has been compiled, and all local
+            // variables are out of scope, so we can remove the node from the trie.
+            *nameLink = NULL;
+
+            return;
+        }
+    }
+
+    // TODO
+}
 
 // Compile the function body for function with given argCount arguments whose implementation source
 // code ends in the character endCh (typically '}', but 0 for main the function as it ends in the
@@ -167,6 +236,9 @@ u8* compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh) {
     emitU8(0x89);
     emitU8(0x25);
     emitPtr(baseSlot);
+
+    // Compile the actual function content.
+    compileFuncBodyImpl(&rootName, baseSlot, 0, endCh);
 
     // mov esp, ['baseSlot']: Move the stack pointer to the base pointer position, discarding local variables.
     emitU8(0x8B);
