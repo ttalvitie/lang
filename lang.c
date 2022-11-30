@@ -281,10 +281,76 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
         return;
     }
 
-    // Function call '('.
-    fail("Function call with isAssignment = %d, TODO implement", isAssignment);
+    // sub esp, 'callSize': Make space for the arguments and the number of arguments in the stack.
+    // 'callSize' will be filled in after reading the arguments.
+    emitU8(0x81);
+    emitU8(0xEC);
+    u8* callSizeSlot = memPos;
+    emitU32(0);
 
-    fail("TODO: implement");
+    u32 argCount = 0;
+    if(isAssignment) {
+        // This is an assignment; use eax as the first argument.
+        argCount = 1;
+
+        // mov dword [esp+4], eax: Copy eax to the first argument.
+        emitU8(0x89);
+        emitU8(0x44);
+        emitU8(0x24);
+        emitU8(0x04);
+    }
+
+    readCh();
+    while(ch != ')') {
+        // TODO: implement support for non-numeric arguments
+        u32 val = 0;
+        while(ch != ',' && ch != ')') {
+            if(ch < '0' || ch > '9') {
+                fail("Unexpected character");
+            }
+            val *= 10;
+            val += (u32)ch - (u32)'0';
+
+            readCh();
+        }
+        if(ch == ',') {
+            readCh();
+        }
+
+        argCount += 1;
+
+        // mov dword [esp+'4 * argCount'], 'val': Copy the value to the corresponding argument.
+        emitU8(0xC7);
+        emitU8(0x84);
+        emitU8(0x24);
+        emitU32(4 * argCount);
+        emitU32(val);
+    }
+
+    // mov dword [esp], 'argCount': Write the number of arguments to the top of the stack.
+    emitU8(0xC7);
+    emitU8(0x04);
+    emitU8(0x24);
+    emitU32(argCount);
+
+    // Fill in the space needed for the argument list to the slot that was reserved earlier.
+    writeU32(callSizeSlot, 4 * (argCount + 1));
+
+    // mov eax, ['name->varBaseSlot']: Copy the base pointer of the function variable to eax.
+    emitU8(0xA1);
+    emitPtr(name->varBaseSlot);
+
+    // call [eax+'name->varOffset']: Call the function.
+    emitU8(0xFF);
+    emitU8(0x90);
+    emitU32(name->varOffset);
+
+    if(endCh != 255) {
+        // Compile the rest of the function calls.
+        name = &rootName;
+        isAssignment = 0;
+        compileFuncBodyImpl(name, isAssignment, varBaseSlot, varOffset, endCh);
+    }
 }
 
 // Compile the function body for function with given argCount arguments whose implementation source
@@ -416,15 +482,21 @@ u8* emitIdentityFunction() {
     emitU8(0x75);
     emitU8(0xFE);
 
-    // pop ecx: Read the second argument (the value) to ecx.
-    emitU8(0x59);
-
     // pop ebx: Read the first argument (the output pointer) to ebx.
     emitU8(0x5B);
 
+    // pop ecx: Read the second argument (the value) to ecx.
+    emitU8(0x59);
+/*
     // mov [ebx], ecx: Write the value to the output.
     emitU8(0x89);
     emitU8(0x0B);
+*/
+    // TODO: remove memStart offset
+    // mov [ebx+'memStart'], ecx: Write the value to the output.
+    emitU8(0x89);
+    emitU8(0x8B);
+    emitPtr(memStart);
 
     // jmp eax: Return from the function by jumping to the return address stored in eax.
     emitU8(0xFF);
