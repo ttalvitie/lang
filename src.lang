@@ -9,7 +9,7 @@ write32:(0)
 %           pop eax         ; Pop the number of arguments to eax.
 %           cmp eax, 0
 %   fail:   je fail         ; If there are no arguments, loop forever. (TODO: better error handling)
-%           pop ebx         ; Pop the return value pointer to ebx.
+%           pop ebx         ; Pop the return value address to ebx.
 %           mov ecx, 0      ; Initialize result storage in ecx to zero.
 %   loop:   dec eax         ; Decrement eax, maintaining it as the number of unprocessed arguments.
 %           cmp eax, 0
@@ -17,9 +17,45 @@ write32:(0)
 %           pop edx         ; Pop the next argument to edx.
 %           add ecx, edx    ; Add the argument to the result in ecx.
 %           jmp loop        ; Continue loop.
-%   done:   mov [ebx], ecx  ; Save the result to the return value pointer.
+%   done:   mov [ebx], ecx  ; Save the result to the return value address.
 %           jmp ebp         ; Return to the return address.
 %
 add:($5D5883F80074FE5BB9000000004883F80074055A01D1EBF5890BFFE5)
 
-write32(brk, add(5, 1, 2))
+% =mul(...): Return the product of all arguments.
+%
+% Assembly source:
+%           pop ebp         ; Pop the return address to ebp.
+%           pop ecx         ; Pop the number of arguments to ecx.
+%           cmp ecx, 0
+%   fail:   je fail         ; If there are no arguments, loop forever. (TODO: better error handling)
+%           pop ebx         ; Pop the return value address to ebx.
+%           mov eax, 1      ; Initialize result storage in eax to zero.
+%   loop:   dec ecx         ; Decrement ecx, maintaining it as the number of unprocessed arguments.
+%           cmp ecx, 0
+%           je done         ; If there are no unprocessed arguments remaining, end loop.
+%           pop edx         ; Pop the next argument to edx.
+%           mul edx         ; Multiple the result in eax by the argument.
+%           jmp loop        ; Continue loop.
+%   done:   mov [ebx], eax  ; Save the result to the return value address.
+%           jmp ebp         ; Return to the return address.
+%
+mul:($5D5983F90074FE5BB8010000004983F90074055AF7E2EBF58903FFE5)
+
+% =sub(a, b): Return the difference of 'a' and 'b'.
+%
+% Assembly source:
+%           pop ebp         ; Pop the return address to ebp.
+%           pop eax         ; Pop the number of arguments to eax.
+%           cmp eax, 3
+%   fail:   jne fail        ; If the number of arguments is not 3, loop forever. (TODO: better error handling)
+%           pop ecx         ; Pop the return value address to ecx.
+%           pop eax         ; Pop 'a' to eax.
+%           pop ebx         ; Pop 'b' to ebx.
+%           sub eax, ebx    ; Compute the difference to eax.
+%   done:   mov [ecx], eax  ; Save the result to the return value address.
+%           jmp ebp         ; Return to the return address.
+%
+sub:($5D5883F80375FE59585B29D88901FFE5)
+
+write32(brk, mul(sub(add(5, 1, 2), 3), sub(0, 2), sub(0, 2)))
