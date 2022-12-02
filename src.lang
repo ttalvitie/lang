@@ -1,9 +1,25 @@
-gaa:([x, add]{
-    asd:(x)
-    bsd:(123)
-    % COMMENT
-    (&bsd, (asd))
-    (brk, add(bsd, 123))
-})
-gaa(#1A2B3C4D, $585B83FB0375FE5B595A01D1890BFFE0)
-% asdfa
+% write32(ptr, val): Write 32-bit value 'val' to 'ptr'.
+write32:(0)
+(&write32,)
+
+% =add(...): Return the sum of all arguments.
+%
+% Assembly source:
+%           pop ebp         ; Pop the return address to ebp.
+%           pop eax         ; Pop the number of arguments to eax.
+%           cmp eax, 0
+%   fail:   je fail         ; If there are no arguments, loop forever. (TODO: better error handling)
+%           pop ebx         ; Pop the return value pointer to ebx.
+%           mov ecx, 0      ; Initialize result storage in ecx to zero.
+%   loop:   dec eax         ; Decrement eax, maintaining it as the number of unprocessed arguments.
+%           cmp eax, 0
+%           je done         ; If there are no unprocessed arguments remaining, end loop.
+%           pop edx         ; Pop the next argument to edx.
+%           add ecx, edx    ; Add the argument to the result in ecx.
+%           jmp loop        ; Continue loop.
+%   done:   mov [ebx], ecx  ; Save the result to the return value pointer.
+%           jmp ebp         ; Return to the return address.
+%
+add:($5D5883F80074FE5BB9000000004883F80074055A01D1EBF5890BFFE5)
+
+write32(brk, add(5, 1, 2))

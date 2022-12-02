@@ -682,9 +682,12 @@ u8* emitEntryPointGlue() {
     // pushad: Save all registers to stack.
     emitU8(0x60);
 
-    // mov ebp, esp: Save the original stack pointer to ebp.
+    // mov ['origStackPtrSlot'], esp: Save the original stack pointer to origStackPtrSlot.
+    // (The origStackPtrSlot address will be filled in after it is created after this glue.)
     emitU8(0x89);
-    emitU8(0xE5);
+    emitU8(0x25);
+    u8* origStackPtrSlot1 = memPos;
+    emitPtr(NULL);
 
     // mov esp, 'memEnd': Move the stack pointer to the end of the memory block.
     emitU8(0xBC);
@@ -704,15 +707,26 @@ u8* emitEntryPointGlue() {
     emitU8(0xFF);
     emitU8(0xD0);
 
-    // mov esp, ebp: Restore original stack pointer used in the C program from ebp.
-    emitU8(0x89);
-    emitU8(0xEC);
+    // mov esp, ['origStackPtrSlot']: Restore the original stack pointer used in the C program
+    // from origStackPtrSlot.
+    // (The origStackPtrSlot address will be filled in after it is created after this glue.)
+    emitU8(0x8B);
+    emitU8(0x25);
+    u8* origStackPtrSlot2 = memPos;
+    emitPtr(NULL);
 
     // popad: Restore all registers from stack.
     emitU8(0x61);
 
     // ret: Return to the C program.
     emitU8(0xC3);
+
+    // Create a slot for storing the original stack pointer and fill in its address to the
+    // instructions using it.
+    writePtr(origStackPtrSlot1, memPos);
+    writePtr(origStackPtrSlot2, memPos);
+    emitPtr(NULL);
+
 
     return mainFuncCallAddr;
 }
