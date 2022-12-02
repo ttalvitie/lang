@@ -181,7 +181,26 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
 // Uses the current character in 'ch' as the first character, and reads up to the character that
 // ends the argument (',' or ')').
 void compileCallArgument() {
-    if(ch >= '0' && ch <= '9') {
+    if(ch == '#') {
+        // Hexadecimal literal.
+        u32 val = 0;
+        readCh();
+        while(ch != ',' && ch != ')') {
+            val *= 16;
+            if(ch >= '0' && ch <= '9') {
+                val += ch - '0';
+            } else if(ch >= 'A' && ch <= 'F') {
+                val += 10 + (ch - 'A');
+            } else {
+                fail("Unexpected character");
+            }
+            readCh();
+        }
+
+        // mov ebx, 'val': Copy the argument value to ebx.
+        emitU8(0xBB);
+        emitU32(val);
+    } else if(ch >= '0' && ch <= '9') {
         // Decimal literal.
         u32 val = 0;
         while(ch != ',' && ch != ')') {
