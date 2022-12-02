@@ -293,7 +293,7 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
         // This is an assignment; use eax as the first argument.
         argCount = 1;
 
-        // mov dword [esp+4], eax: Copy eax to the first argument.
+        // mov [esp+4], eax: Copy eax to the first argument.
         emitU8(0x89);
         emitU8(0x44);
         emitU8(0x24);
@@ -301,30 +301,61 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
     }
 
     readCh();
-    while(ch != ')') {
-        // TODO: implement support for non-numeric arguments
-        u32 val = 0;
-        while(ch != ',' && ch != ')') {
-            if(ch < '0' || ch > '9') {
-                fail("Unexpected character");
+    if(ch != ')') {
+        while(1) {
+            if(ch >= '0' && ch <= '9') {
+                // Decimal literal.
+                u32 val = 0;
+                while(ch != ',' && ch != ')') {
+                    if(ch < '0' || ch > '9') {
+                        fail("Unexpected character");
+                    }
+                    val *= 10;
+                    val += ch - '0';
+                    readCh();
+                }
+
+                // mov eax, 'val': Copy the argument value to eax.
+                emitU8(0xB8);
+                emitU32(val);
+            } else {
+                // Variable name.
+                Name* varName = &rootName;
+                while(ch != ',' && ch != ')') {
+                    if(!extendName(ch, &varName, NULL, NULL)) {
+                        varName = NULL;
+                        break;
+                    }
+                    readCh();
+                }
+
+                if(varName == NULL || !varName->hasVar) {
+                    fail("Variable with given name does not exist");
+                }
+
+                // mov eax, ['varName->varBaseSlot']: Copy the base pointer of the argument variable to eax.
+                emitU8(0xA1);
+                emitPtr(varName->varBaseSlot);
+
+                // mov eax, [eax+'varName->varOffset']: Copy the variable value to eax.
+                emitU8(0x8B);
+                emitU8(0x80);
+                emitU32(varName->varOffset);
             }
-            val *= 10;
-            val += (u32)ch - (u32)'0';
 
+            ++argCount;
+
+            // mov [esp+'4 * argCount'], eax: Copy the argument value stored in eax to the argument slot in the stack.
+            emitU8(0x89);
+            emitU8(0x84);
+            emitU8(0x24);
+            emitU32(4 * argCount);
+
+            if(ch == ')') {
+                break;
+            }
             readCh();
         }
-        if(ch == ',') {
-            readCh();
-        }
-
-        argCount += 1;
-
-        // mov dword [esp+'4 * argCount'], 'val': Copy the value to the corresponding argument.
-        emitU8(0xC7);
-        emitU8(0x84);
-        emitU8(0x24);
-        emitU32(4 * argCount);
-        emitU32(val);
     }
 
     // mov dword [esp], 'argCount': Write the number of arguments to the top of the stack.
@@ -487,16 +518,10 @@ u8* emitIdentityFunction() {
 
     // pop ecx: Read the second argument (the value) to ecx.
     emitU8(0x59);
-/*
+
     // mov [ebx], ecx: Write the value to the output.
     emitU8(0x89);
     emitU8(0x0B);
-*/
-    // TODO: remove memStart offset
-    // mov [ebx+'memStart'], ecx: Write the value to the output.
-    emitU8(0x89);
-    emitU8(0x8B);
-    emitPtr(memStart);
 
     // jmp eax: Return from the function by jumping to the return address stored in eax.
     emitU8(0xFF);
@@ -590,11 +615,10 @@ int main(int argc, char* argv[]) {
 
     initMem();
 
-    // The program will write the zero-terminated output string to the center of the memory.
-    u8* outString = memStart + memSize / 2;
-    *outString = 0;
-
     u8* entryPoint = compile();
+
+    // TEST TODO REMOVE: Program will write output value to initial program break.
+    u8* outputSlot = memPos;
 
     // Compilation done; do not show source information in subsequent error messages.
     chHistoryShowOnError = 0;
@@ -608,13 +632,8 @@ int main(int argc, char* argv[]) {
     __builtin___clear_cache(memStart, memEnd);
     entryPointFunc();
 
-    // Print the output string of the program.
-    while(*outString != 0) {
-        putchar((int)*outString++);
-    }
-
     // TEST
-    printf("%x\n", *(u32*)(memStart + 10000));
+    printf("%x\n", *(u32*)outputSlot);
 
     return 0;
 }
