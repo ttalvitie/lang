@@ -175,6 +175,7 @@ int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
     }
 }
 
+u8* compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh);
 void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varOffset, u8 endCh);
 
 // Compile function call argument. The emitted implementation writes the value to ebx.
@@ -218,7 +219,7 @@ void compileCallArgument() {
     } else if(ch == '$') {
         // Binary string literal (in hexadecimal).
 
-        // mov ebx, 'endPtr': Copy the address to the code after the binary string literal to ebx
+        // mov ebx, 'endPtr': Copy the address of the code after the binary string literal to ebx
         // (to be filled in after emitting the string).
         emitU8(0xBB);
         u8* endPtrSlot = memPos;
@@ -249,13 +250,41 @@ void compileCallArgument() {
             emitU8(byte);
         }
 
-        // Fill in the address to the code after the binary string to the slot that was reserved
+        // Fill in the address of the code after the binary string to the slot that was reserved
         // earlier.
         writePtr(endPtrSlot, memPos);
 
         // mov ebx, 'stringPtr': Copy the pointer to the start of the binary string to ebx.
         emitU8(0xBB);
         emitPtr(stringPtr);
+    } else if(ch == '{') {
+        // Function literal.
+
+        // mov ebx, 'endPtr': Copy the address to the code after the function implementation to ebx
+        // (to be filled in after emitting the string).
+        emitU8(0xBB);
+        u8* endPtrSlot = memPos;
+        emitPtr(NULL);
+
+        // jmp ebx: Jump to the code after the function implementation.
+        emitU8(0xFF);
+        emitU8(0xE3);
+
+        // Create a base pointer slot for the function.
+        u8* baseSlot = memPos;
+        emitPtr(NULL);
+
+        // Compile the function body.
+        u8* entryPoint = compileFuncBody(baseSlot, 0, '}');
+        readCh();
+
+        // Fill in the address of the code after the function implementation to the slot that was
+        // reserved earlier.
+        writePtr(endPtrSlot, memPos);
+
+        // mov ebx, 'entryPoint': Copy the pointer to the entry point of the function to ebx.
+        emitU8(0xBB);
+        emitPtr(entryPoint);
     } else {
         // Variable name, address or function call.
         int addr = 0;
