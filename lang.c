@@ -216,7 +216,13 @@ void compileCallArgument() {
         emitU8(0xBB);
         emitU32(val);
     } else {
-        // Variable name or function call.
+        // Variable name, address or function call.
+        int addr = 0;
+        if(ch == '&') {
+            addr = 1;
+            readCh();
+        }
+
         Name* varName = &rootName;
         while(ch != ',' && ch != ')' && ch != '(') {
             if(!extendName(ch, &varName, NULL, NULL)) {
@@ -233,6 +239,10 @@ void compileCallArgument() {
         if(ch == '(') {
             // Function call.
 
+            if(addr) {
+                fail("Cannot take address of function call");
+            }
+
             // push 0: Make a slot in stack for the return value of the call.
             emitU8(0x6A);
             emitU8(0x00);
@@ -248,17 +258,24 @@ void compileCallArgument() {
             // pop ebx: Pop the return value from the return value slot in the stack to ebx.
             emitU8(0x5B);
         } else {
-            // Variable name.
+            // Variable name or address.
 
             // mov ebx, ['varName->varBaseSlot']: Copy the base pointer of the argument variable to eax.
             emitU8(0x8B);
             emitU8(0x1D);
             emitPtr(varName->varBaseSlot);
 
-            // mov ebx, [ebx+'varName->varOffset']: Copy the variable value to eax.
-            emitU8(0x8B);
-            emitU8(0x9B);
-            emitU32(varName->varOffset);
+            if(addr) {
+                // add ebx, 'varName->varOffset': Compute the variable address to eax.
+                emitU8(0x81);
+                emitU8(0xC3);
+                emitU32(varName->varOffset);
+            } else {
+                // mov ebx, [ebx+'varName->varOffset']: Copy the variable value to eax.
+                emitU8(0x8B);
+                emitU8(0x9B);
+                emitU32(varName->varOffset);
+            }
         }
     }
 }

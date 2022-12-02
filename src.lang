@@ -1,4 +1,4 @@
 asd:(#ABCDABBA)
 bsd:(5)
-bsd=((asd))
+(&bsd, asd)
 (brk, (((bsd))))
