@@ -1,7 +1,3 @@
-% write32(ptr, val): Write 32-bit value 'val' to 'ptr'.
-write32:(0)
-(&write32,)
-
 % =add(...): Return the sum of all arguments.
 %
 % Assembly source:
@@ -20,7 +16,7 @@ write32:(0)
 %   done:   mov [ebx], ecx  ; Save the result to the return value address.
 %           jmp ebp         ; Return to the return address.
 %
-add:($5D5883F80074FE5BB9000000004883F80074055A01D1EBF5890BFFE5)
+add : ($5D5883F80074FE5BB9000000004883F80074055A01D1EBF5890BFFE5)
 
 % =mul(...): Return the product of all arguments.
 %
@@ -40,7 +36,7 @@ add:($5D5883F80074FE5BB9000000004883F80074055A01D1EBF5890BFFE5)
 %   done:   mov [ebx], eax  ; Save the result to the return value address.
 %           jmp ebp         ; Return to the return address.
 %
-mul:($5D5983F90074FE5BB8010000004983F90074055AF7E2EBF58903FFE5)
+mul : ($5D5983F90074FE5BB8010000004983F90074055AF7E2EBF58903FFE5)
 
 % =sub(a, b): Return the difference of 'a' and 'b'.
 %
@@ -56,7 +52,7 @@ mul:($5D5983F90074FE5BB8010000004983F90074055AF7E2EBF58903FFE5)
 %   done:   mov [ecx], eax  ; Save the result to the return value address.
 %           jmp ebp         ; Return to the return address.
 %
-sub:($5D5883F80375FE59585B29D88901FFE5)
+sub : ($5D5883F80375FE59585B29D88901FFE5)
 
 % =lt(a, b): Returns 1 if 'a' is less than 'b', and 0 otherwise.
 %
@@ -74,7 +70,23 @@ sub:($5D5883F80375FE59585B29D88901FFE5)
 %           mov [ecx], edx  ; Save the result to the return value address.
 %           jmp ebp         ; Return to the return address.
 %
-lt:($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
+lt : ($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
 
-write32(brk, mul(sub(add(5, 1, 2), 3), sub(0, 2), sub(0, 2)))
-write32(brk, lt(5, sub(0, 1)))
+% Define put as an alias for the empty-name 32-bit memory write function.
+put : (0)
+(&put, )
+
+% Comparison operators.
+eq : ([ret, a, b]{ put(ret, lt(sub(a, b), 1)) })
+ne : ([ret, a, b]{ put(ret, sub(1, eq(a, b))) })
+gt : ([ret, a, b]{ put(ret, lt(b, a)) })
+leq : ([ret, a, b]{ put(ret, sub(1, gt(a, b))) })
+geq : ([ret, a, b]{ put(ret, sub(1, lt(a, b))) })
+
+% Logical operators.
+not : ([ret, x]{ put(ret, eq(x, 0)) })
+and : ([ret, a, b]{ put(ret, not(add(not(a), not(b)))) })
+or : ([ret, a, b]{ put(ret, not(and(not(a), not(b)))) })
+
+put(brk, mul(sub(add(5, 1, 2), 3), sub(0, 2), sub(0, 2)))
+put(brk, or(4, 0))
