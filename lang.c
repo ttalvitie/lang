@@ -175,16 +175,15 @@ int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
     }
 }
 
-u8* compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh);
+void compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh);
 void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varOffset, u8 endCh);
 
 // Compiles a function literal with an argument list. Recursive implementation; argName is the
 // prefix of the current argument name read so far, and argCount is the number of complete arguments
 // read. 'baseSlot' is the slot containing the current base pointer of the function.
 // Discards the current character; assumes that the square bracket starting the argument list has
-// already been read. After reading the argument list, proceeds to compileFuncBody and returns the
-// entry point.
-u8* compileFuncLiteralWithArgumentList(Name* argName, u32 argCount, u8* baseSlot) {
+// already been read. After reading the argument list, proceeds to compileFuncBody.
+void compileFuncLiteralWithArgumentList(Name* argName, u32 argCount, u8* baseSlot) {
     readCh();
 
     if(ch == ']' || ch == ',') {
@@ -202,39 +201,39 @@ u8* compileFuncLiteralWithArgumentList(Name* argName, u32 argCount, u8* baseSlot
 
         ++argCount;
 
-        u8* entryPoint;
         if(ch == ']') {
             // End of argument list; proceed to compiling the function body.
             readCh();
             if(ch != '{') {
                 fail("Expected '{'");
             }
-            entryPoint = compileFuncBody(baseSlot, argCount, '}');
+            compileFuncBody(baseSlot, argCount, '}');
         } else {
             // ch == ',': read the rest of the argument list.
-            entryPoint = compileFuncLiteralWithArgumentList(&rootName, argCount, baseSlot);
+            compileFuncLiteralWithArgumentList(&rootName, argCount, baseSlot);
         }
 
         // Function body compiled, so the variable is out of scope; remove it.
         argName->hasVar = 0;
 
-        return entryPoint;
+        return;
     }
 
     // Extend the name prefix and continue.
     Name newNameNode;
     Name** nameLink;
     if(extendName(ch, &argName, &newNameNode, &nameLink)) {
-        return compileFuncLiteralWithArgumentList(argName, argCount, baseSlot);
+        compileFuncLiteralWithArgumentList(argName, argCount, baseSlot);
+        return;
     } else {
         // newNameNode is now part of the trie, so to persist it we need to recurse.
-        u8* entryPoint = compileFuncLiteralWithArgumentList(argName, argCount, baseSlot);
+        compileFuncLiteralWithArgumentList(argName, argCount, baseSlot);
 
         // After the recursive call, the function body has been compiled, and all local
         // variables are out of scope, so we can remove the node from the trie.
         *nameLink = NULL;
 
-        return entryPoint;
+        return;
     }
 }
 
@@ -334,13 +333,15 @@ void compileCallArgument() {
         u8* baseSlot = memPos;
         emitPtr(NULL);
 
-        u8* entryPoint;
+        // Save the entry point of the function.
+        u8* entryPoint = memPos;
+
         if(ch == '[') {
             // Create a variable for each argument and then compile function body.
-            entryPoint = compileFuncLiteralWithArgumentList(&rootName, 0, baseSlot);
+            compileFuncLiteralWithArgumentList(&rootName, 0, baseSlot);
         } else {
             // No arguments; proceed to compiling the function body directly.
-            entryPoint = compileFuncBody(baseSlot, 0, '}');
+            compileFuncBody(baseSlot, 0, '}');
         }
         readCh();
 
@@ -597,11 +598,9 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
 // code ends in the character endCh (typically '}', but 0 for main the function as it ends in the
 // end of the source code). baseSlot should be the location where the function can store its stack
 // base pointer upon being called.
+// The entry point of the function is memPos before the call.
 // Discards the current character; stops reading after reading the end character.
-u8* compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh) {
-    // Start emitting the function implementation.
-    u8* entryPoint = memPos;
-
+void compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh) {
     // cmp dword [esp+4], 'argCount': Compare the number of arguments from stack to 'argCount'.
     emitU8(0x81);
     emitU8(0x7C);
@@ -648,8 +647,6 @@ u8* compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh) {
     // jmp eax: Return from the function by jumping to the return address stored in eax.
     emitU8(0xFF);
     emitU8(0xE0);
-
-    return entryPoint;
 }
 
 u8* compileMainFunc() {
@@ -657,8 +654,12 @@ u8* compileMainFunc() {
     u8* baseSlot = memPos;
     emitPtr(NULL);
 
+    u8* entryPoint = memPos;
+
     // Compile the main function as a function body that ends at the end of the file (character 0).
-    return compileFuncBody(baseSlot, 0, 0);
+    compileFuncBody(baseSlot, 0, 0);
+
+    return entryPoint;
 }
 
 // Emit the main program entry point code that can be called from the C program and will run the
