@@ -192,7 +192,7 @@ void compileCallArgument() {
             } else if(ch >= 'A' && ch <= 'F') {
                 val += 10 + (ch - 'A');
             } else {
-                fail("Unexpected character");
+                fail("Expected hexadecimal digit");
             }
             readCh();
         }
@@ -205,7 +205,7 @@ void compileCallArgument() {
         u32 val = 0;
         while(ch != ',' && ch != ')') {
             if(ch < '0' || ch > '9') {
-                fail("Unexpected character");
+                fail("Expected decimal digit");
             }
             val *= 10;
             val += ch - '0';
@@ -215,6 +215,47 @@ void compileCallArgument() {
         // mov ebx, 'val': Copy the argument value to ebx.
         emitU8(0xBB);
         emitU32(val);
+    } else if(ch == '$') {
+        // Binary string literal (in hexadecimal).
+
+        // mov ebx, 'endPtr': Copy the address to the code after the binary string literal to ebx
+        // (to be filled in after emitting the string).
+        emitU8(0xBB);
+        u8* endPtrSlot = memPos;
+        emitPtr(NULL);
+
+        // jmp ebx: Jump to the code after the binary string.
+        emitU8(0xFF);
+        emitU8(0xE3);
+
+        // Save the pointer to the start of the binary string.
+        u8* stringPtr = memPos;
+
+        // Read and emit the bytes.
+        readCh();
+        while(ch != ',' && ch != ')') {
+            u8 byte = 0;
+            for(int i = 0; i < 2; ++i) {
+                byte *= 16;
+                if(ch >= '0' && ch <= '9') {
+                    byte += ch - '0';
+                } else if(ch >= 'A' && ch <= 'F') {
+                    byte += 10 + (ch - 'A');
+                } else {
+                    fail("Expected hexadecimal digit");
+                }
+                readCh();
+            }
+            emitU8(byte);
+        }
+
+        // Fill in the address to the code after the binary string to the slot that was reserved
+        // earlier.
+        writePtr(endPtrSlot, memPos);
+
+        // mov ebx, 'stringPtr': Copy the pointer to the start of the binary string to ebx.
+        emitU8(0xBB);
+        emitPtr(stringPtr);
     } else {
         // Variable name, address or function call.
         int addr = 0;

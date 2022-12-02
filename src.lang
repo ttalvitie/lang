@@ -1,4 +1,5 @@
-asd:(#ABCDABBA)
+add:($585B83FB0375FE5B595A01D1890BFFE0)
+asd:(#1A2B3C4D)
 bsd:(5)
-(&bsd, asd)
-(brk, (((bsd))))
+(&bsd, (asd))
+(brk, add(bsd, 123))
