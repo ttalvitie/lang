@@ -445,6 +445,18 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
         return;
     }
 
+    // Allow comments starting with % and ending at newline for actual function bodies.
+    if(name == &rootName && !isAssignment && endCh != 255 && ch == '%') {
+        while(ch != '\n' && ch != 0) {
+            readRawCh();
+        }
+        if(ch != 0) {
+            readCh();
+        }
+        compileFuncBodyImpl(name, isAssignment, varBaseSlot, varOffset, endCh);
+        return;
+    }
+
     if(ch != '(' && ch != ':' && ch != '=') {
         // Not a special character; extend the name prefix and continue.
         Name newNameNode;

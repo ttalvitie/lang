@@ -1,7 +1,9 @@
 gaa:([x, add]{
     asd:(x)
     bsd:(123)
+    % COMMENT
     (&bsd, (asd))
     (brk, add(bsd, 123))
 })
 gaa(#1A2B3C4D, $585B83FB0375FE5B595A01D1890BFFE0)
+% asdfa
