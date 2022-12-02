@@ -58,4 +58,23 @@ mul:($5D5983F90074FE5BB8010000004983F90074055AF7E2EBF58903FFE5)
 %
 sub:($5D5883F80375FE59585B29D88901FFE5)
 
+% =lt(a, b): Returns 1 if 'a' is less than 'b', and 0 otherwise.
+%
+% Assembly source:
+%           pop ebp         ; Pop the return address to ebp.
+%           pop eax         ; Pop the number of arguments to eax.
+%           cmp eax, 3
+%   fail:   jne fail        ; If the number of arguments is not 3, loop forever. (TODO: better error handling)
+%           pop ecx         ; Pop the return value address to ecx.
+%           pop eax         ; Pop 'a' to eax.
+%           pop ebx         ; Pop 'b' to ebx.
+%           mov edx, 0      ; Set result value to 0.
+%           cmp eax, ebx
+%           setb dl         ; If eax is less than ebx, set result to 1.
+%           mov [ecx], edx  ; Save the result to the return value address.
+%           jmp ebp         ; Return to the return address.
+%
+lt:($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
+
 write32(brk, mul(sub(add(5, 1, 2), 3), sub(0, 2), sub(0, 2)))
+write32(brk, lt(5, sub(0, 1)))
