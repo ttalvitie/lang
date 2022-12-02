@@ -175,6 +175,75 @@ int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
     }
 }
 
+void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varOffset, u8 endCh);
+
+// Compile function call argument. The emitted implementation writes the value to ebx.
+// Uses the current character in 'ch' as the first character, and reads up to the character that
+// ends the argument (',' or ')').
+void compileCallArgument() {
+    if(ch >= '0' && ch <= '9') {
+        // Decimal literal.
+        u32 val = 0;
+        while(ch != ',' && ch != ')') {
+            if(ch < '0' || ch > '9') {
+                fail("Unexpected character");
+            }
+            val *= 10;
+            val += ch - '0';
+            readCh();
+        }
+
+        // mov ebx, 'val': Copy the argument value to ebx.
+        emitU8(0xBB);
+        emitU32(val);
+    } else {
+        // Variable name or function call.
+        Name* varName = &rootName;
+        while(ch != ',' && ch != ')' && ch != '(') {
+            if(!extendName(ch, &varName, NULL, NULL)) {
+                varName = NULL;
+                break;
+            }
+            readCh();
+        }
+
+        if(varName == NULL || !varName->hasVar) {
+            fail("Variable with given name does not exist");
+        }
+
+        if(ch == '(') {
+            // Function call.
+
+            // push 0: Make a slot in stack for the return value of the call.
+            emitU8(0x6A);
+            emitU8(0x00);
+
+            // mov eax, esp: Point eax to the return value slot.
+            emitU8(0x89);
+            emitU8(0xE0);
+
+            // Compile the call as a single function call with assignment.
+            compileFuncBodyImpl(varName, 1, NULL, 0, 255);
+            readCh();
+
+            // pop ebx: Pop the return value from the return value slot in the stack to ebx.
+            emitU8(0x5B);
+        } else {
+            // Variable name.
+
+            // mov ebx, ['varName->varBaseSlot']: Copy the base pointer of the argument variable to eax.
+            emitU8(0x8B);
+            emitU8(0x1D);
+            emitPtr(varName->varBaseSlot);
+
+            // mov ebx, [ebx+'varName->varOffset']: Copy the variable value to eax.
+            emitU8(0x8B);
+            emitU8(0x9B);
+            emitU32(varName->varOffset);
+        }
+    }
+}
+
 // Implementation of the actual function body compilation in compileFuncBody; tracks compilation
 // state in the arguments and uses recursion for compilation of sub-units (and stack allocation
 // of name trie nodes).
@@ -191,14 +260,14 @@ int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
 // assigns the function result to the address in register eax (that is, passes the value in eax as
 // the first argument).
 //
-// The 'var*' arguments specify the base pointer slot and offset for creating new variables.
+// The 'var*' arguments specify the base pointer slot and offset for creating new variables. They
+// are ignored if endCh is 255 (as new variables cannot be created then).
 //
-// The function always first reads a new character, discarding the original value of 'ch'. After
-// reading the last character (if endCh is 255, the closing parenthesis and otherwise the occurence
-// of endCh), no further reads are made prior to returning.
+// Uses the current character in 'ch' as the first character. After reading the last character (if
+// endCh is 255, the closing parenthesis and otherwise the occurence of endCh), no further reads
+// are made prior to returning.
 void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varOffset, u8 endCh)
 {
-    readCh();
     if(endCh != 255 && ch == endCh && !isAssignment && name == &rootName) {
         return;
     }
@@ -208,10 +277,12 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
         Name newNameNode;
         Name** nameLink;
         if(extendName(ch, &name, &newNameNode, &nameLink)) {
+            readCh();
             compileFuncBodyImpl(name, isAssignment, varBaseSlot, varOffset, endCh);
             return;
         } else {
             // newNameNode is now part of the trie, so to persist it we need to recurse.
+            readCh();
             compileFuncBodyImpl(name, isAssignment, varBaseSlot, varOffset, endCh);
 
             // After the recursive call, the function body has been compiled, and all local
@@ -248,6 +319,7 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
 
         // Compile the function call and the remainder of the body in a recursive call, using
         // isAssignment = 1 to enable the assignment.
+        readCh();
         compileFuncBodyImpl(&rootName, 1, varBaseSlot, varOffset, endCh);
 
         // After the recursive call, the function body has been compiled, and all local
@@ -277,6 +349,7 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
         // enable the assignment.
         name = &rootName;
         isAssignment = 1;
+        readCh();
         compileFuncBodyImpl(name, isAssignment, varBaseSlot, varOffset, endCh);
         return;
     }
@@ -303,51 +376,14 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
     readCh();
     if(ch != ')') {
         while(1) {
-            if(ch >= '0' && ch <= '9') {
-                // Decimal literal.
-                u32 val = 0;
-                while(ch != ',' && ch != ')') {
-                    if(ch < '0' || ch > '9') {
-                        fail("Unexpected character");
-                    }
-                    val *= 10;
-                    val += ch - '0';
-                    readCh();
-                }
-
-                // mov eax, 'val': Copy the argument value to eax.
-                emitU8(0xB8);
-                emitU32(val);
-            } else {
-                // Variable name.
-                Name* varName = &rootName;
-                while(ch != ',' && ch != ')') {
-                    if(!extendName(ch, &varName, NULL, NULL)) {
-                        varName = NULL;
-                        break;
-                    }
-                    readCh();
-                }
-
-                if(varName == NULL || !varName->hasVar) {
-                    fail("Variable with given name does not exist");
-                }
-
-                // mov eax, ['varName->varBaseSlot']: Copy the base pointer of the argument variable to eax.
-                emitU8(0xA1);
-                emitPtr(varName->varBaseSlot);
-
-                // mov eax, [eax+'varName->varOffset']: Copy the variable value to eax.
-                emitU8(0x8B);
-                emitU8(0x80);
-                emitU32(varName->varOffset);
-            }
+            // Compile the argument; the value is stored in ebx.
+            compileCallArgument();
 
             ++argCount;
 
-            // mov [esp+'4 * argCount'], eax: Copy the argument value stored in eax to the argument slot in the stack.
+            // mov [esp+'4 * argCount'], ebx: Copy the argument value to the argument slot in the stack.
             emitU8(0x89);
-            emitU8(0x84);
+            emitU8(0x9C);
             emitU8(0x24);
             emitU32(4 * argCount);
 
@@ -380,6 +416,7 @@ void compileFuncBodyImpl(Name* name, int isAssignment, u8* varBaseSlot, u32 varO
         // Compile the rest of the function calls.
         name = &rootName;
         isAssignment = 0;
+        readCh();
         compileFuncBodyImpl(name, isAssignment, varBaseSlot, varOffset, endCh);
     }
 }
@@ -415,6 +452,7 @@ u8* compileFuncBody(u8* baseSlot, u32 argCount, u8 endCh) {
     emitPtr(baseSlot);
 
     // Compile the actual function content.
+    readCh();
     compileFuncBodyImpl(&rootName, 0, baseSlot, 0, endCh);
 
     // mov esp, ['baseSlot']: Move the stack pointer to the base pointer position, discarding local variables.
@@ -633,7 +671,7 @@ int main(int argc, char* argv[]) {
     entryPointFunc();
 
     // TEST
-    printf("%x\n", *(u32*)outputSlot);
+    printf("%u\n", *(u32*)outputSlot);
 
     return 0;
 }
