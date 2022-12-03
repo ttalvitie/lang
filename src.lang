@@ -72,9 +72,9 @@ sub : ($5D5883F80375FE59585B29D88901FFE5)
 %
 lt : ($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
 
-% =readStdin(buf, size):
-%   Read up to 'size' bytes to 'buf'. Return the number of bytes read. If 0 is returned, the end of
-%   the file has been reached.
+% =readStdinRaw(buf, size):
+%   Read up to 'size' bytes from stdin to 'buf'. Return the number of bytes read. If 0 is returned,
+%   the end of the file has been reached.
 %
 % Assembly source:
 %           pop ebp         ; Pop the return address to ebp.
@@ -87,11 +87,12 @@ lt : ($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
 %           pop ecx         ; Use the 'buf' argument as output address.
 %           pop edx         ; Use the 'size' argument as the maximum number of bytes to read.
 %           int 0x80        ; Perform the system call.
-%                           ; TODO: error handling
+%           cmp eax, 0
+%   fail2:  jl fail2        ; If an error occured (negative return value), loop forever. (TODO: better error handling)
 %           mov [edi], eax  ; Save the number of read bytes to the return value address.
 %           jmp ebp         ; Return to the return address.
 %
-readStdin : ($5D5883F80375FE5FB803000000BB00000000595ACD808907FFE5)
+readStdinRaw : ($5D5883F80375FE5FB803000000BB00000000595ACD8083F8007CFE8907FFE5)
 
 % Define put as an alias for the empty-name 32-bit memory write function.
 put : (0)
@@ -110,5 +111,5 @@ and : ([ret, a, b]{ put(ret, not(add(not(a), not(b)))) })
 or : ([ret, a, b]{ put(ret, not(and(not(a), not(b)))) })
 
 x : (0)
-y : readStdin(&x, 4)
+y : readStdinRaw(&x, 4)
 put(brk, x)

@@ -12,6 +12,6 @@ fi
 
 if nasm -f bin -o "${TMPDIR}/binary" "${TMPDIR}/src.asm"
 then
-    xxd -u -p "${TMPDIR}/binary"
+    xxd -u -c 100000 -p "${TMPDIR}/binary"
 fi
 rm -r -- "${TMPDIR}"
