@@ -72,7 +72,7 @@ sub : ($5D5883F80375FE59585B29D88901FFE5)
 %
 lt : ($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
 
-% =readStdinRaw(buf, size):
+% =readSomeStdin(buf, size):
 %   Read up to 'size' bytes from stdin to 'buf'. Return the number of bytes read. 'size' must be
 %   nonzero. If 0 is returned, the end of the file has been reached.
 %
@@ -92,9 +92,9 @@ lt : ($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
 %           mov [edi], eax  ; Save the number of read bytes to the return value address.
 %           jmp ebp         ; Return to the return address.
 %
-readStdinRaw : ($5D5883F80375FE5FB803000000BB00000000595ACD8083F8007CFE8907FFE5)
+readSomeStdin : ($5D5883F80375FE5FB803000000BB00000000595ACD8083F8007CFE8907FFE5)
 
-% =writeStdoutRaw(buf, size):
+% =writeSomeStdout(buf, size):
 %   Write up to 'size' bytes from 'buf' to stdout. Return the number of bytes written. 'size' must
 %   be nonzero. Writes at least one byte.
 %
@@ -114,7 +114,26 @@ readStdinRaw : ($5D5883F80375FE5FB803000000BB00000000595ACD8083F8007CFE8907FFE5)
 %           mov [edi], eax  ; Save the number of bytes written to the return value address.
 %           jmp ebp         ; Return to the return address.
 %
-writeStdoutRaw : ($5D5883F80375FE5FB804000000BB01000000595ACD8083F8017CFE8907FFE5)
+writeSomeStdout : ($5D5883F80375FE5FB804000000BB01000000595ACD8083F8017CFE8907FFE5)
+
+% whileReturnsTrue(=func):
+%   Call func repeatedly until it returns true (nonzero).
+%
+% Assembly source:
+%           cmp dword [esp+4], 1
+%   fail:   jne fail                ; If the number of arguments is not 1, loop forever. (TODO: better error handling)
+%   loop:   mov eax, esp            ; Copy stack pointer to eax.
+%           add eax, 4              ; Offset pointer in eax such that it points to the first argument (which we no longer need).
+%           push eax                ; Push the pointer to the first argument to the stack as the return value argument for 'func'.
+%           push 1                  ; Push 1 to the stack as the number of arguments for the 'func' call.
+%           call [esp+16]           ; Call 'func'.
+%           cmp dword [esp+4], 0    ; Compare the return value to zero.
+%           jne loop                ; If the return value is nonzero, continue loop.
+%           pop eax                 ; Copy the return address to eax.
+%           add esp, 8              ; Discard the argument list.
+%           jmp eax                 ; Return to the return address.
+%
+whileReturnsTrue : ($837C24040175FE89E083C004506A01FF542410837C24040075ED5883C408FFE0)
 
 % Define put as an alias for the empty-name 32-bit memory write function.
 put : (0)
@@ -132,4 +151,9 @@ not : ([ret, x]{ put(ret, eq(x, 0)) })
 and : ([ret, a, b]{ put(ret, not(add(not(a), not(b)))) })
 or : ([ret, a, b]{ put(ret, not(and(not(a), not(b)))) })
 
-x : writeStdoutRaw($616263640A, 5)
+countdown : (5)
+whileReturnsTrue([ret]{
+    y : writeSomeStdout($616263640A, 5)
+    countdown = sub(countdown, 1)
+    put(ret, countdown)
+})
