@@ -73,8 +73,8 @@ sub : ($5D5883F80375FE59585B29D88901FFE5)
 lt : ($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
 
 % =readStdinRaw(buf, size):
-%   Read up to 'size' bytes from stdin to 'buf'. Return the number of bytes read. If 0 is returned,
-%   the end of the file has been reached.
+%   Read up to 'size' bytes from stdin to 'buf'. Return the number of bytes read. 'size' must be
+%   nonzero. If 0 is returned, the end of the file has been reached.
 %
 % Assembly source:
 %           pop ebp         ; Pop the return address to ebp.
@@ -82,7 +82,7 @@ lt : ($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
 %           cmp eax, 3
 %   fail:   jne fail        ; If the number of arguments is not 3, loop forever. (TODO: better error handling)
 %           pop edi         ; Pop the return value address to edi.
-%           mov eax, 3      ; Use "read" system call.
+%           mov eax, 3      ; Use the "read" system call.
 %           mov ebx, 0      ; Use standard input.
 %           pop ecx         ; Use the 'buf' argument as output address.
 %           pop edx         ; Use the 'size' argument as the maximum number of bytes to read.
@@ -93,6 +93,28 @@ lt : ($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
 %           jmp ebp         ; Return to the return address.
 %
 readStdinRaw : ($5D5883F80375FE5FB803000000BB00000000595ACD8083F8007CFE8907FFE5)
+
+% =writeStdoutRaw(buf, size):
+%   Write up to 'size' bytes from 'buf' to stdout. Return the number of bytes written. 'size' must
+%   be nonzero. Writes at least one byte.
+%
+% Assembly source:
+%           pop ebp         ; Pop the return address to ebp.
+%           pop eax         ; Pop the number of arguments to eax.
+%           cmp eax, 3
+%   fail:   jne fail        ; If the number of arguments is not 3, loop forever. (TODO: better error handling)
+%           pop edi         ; Pop the return value address to edi.
+%           mov eax, 4      ; Use the "write" system call.
+%           mov ebx, 1      ; Use standard output.
+%           pop ecx         ; Use the 'buf' argument as output address.
+%           pop edx         ; Use the 'size' argument as the maximum number of bytes to write.
+%           int 0x80        ; Perform the system call.
+%           cmp eax, 1
+%   fail2:  jl fail2        ; If an error occured (nonpositive return value), loop forever. (TODO: better error handling)
+%           mov [edi], eax  ; Save the number of bytes written to the return value address.
+%           jmp ebp         ; Return to the return address.
+%
+writeStdoutRaw : ($5D5883F80375FE5FB804000000BB01000000595ACD8083F8017CFE8907FFE5)
 
 % Define put as an alias for the empty-name 32-bit memory write function.
 put : (0)
@@ -110,6 +132,4 @@ not : ([ret, x]{ put(ret, eq(x, 0)) })
 and : ([ret, a, b]{ put(ret, not(add(not(a), not(b)))) })
 or : ([ret, a, b]{ put(ret, not(and(not(a), not(b)))) })
 
-x : (0)
-y : readStdinRaw(&x, 4)
-put(brk, x)
+x : writeStdoutRaw($616263640A, 5)
