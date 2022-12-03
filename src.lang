@@ -31,7 +31,7 @@ add : ($5D5883F80074FE5BB9000000004883F80074055A01D1EBF5890BFFE5)
 %           cmp ecx, 0
 %           je done         ; If there are no unprocessed arguments remaining, end loop.
 %           pop edx         ; Pop the next argument to edx.
-%           mul edx         ; Multiple the result in eax by the argument.
+%           mul edx         ; Multiple the result in eax by the argument (edx gets overwritten).
 %           jmp loop        ; Continue loop.
 %   done:   mov [ebx], eax  ; Save the result to the return value address.
 %           jmp ebp         ; Return to the return address.
@@ -72,6 +72,27 @@ sub : ($5D5883F80375FE59585B29D88901FFE5)
 %
 lt : ($5D5883F80375FE59585BBA0000000039D80F92C28911FFE5)
 
+% =readStdin(buf, size):
+%   Read up to 'size' bytes to 'buf'. Return the number of bytes read. If 0 is returned, the end of
+%   the file has been reached.
+%
+% Assembly source:
+%           pop ebp         ; Pop the return address to ebp.
+%           pop eax         ; Pop the number of arguments to eax.
+%           cmp eax, 3
+%   fail:   jne fail        ; If the number of arguments is not 3, loop forever. (TODO: better error handling)
+%           pop edi         ; Pop the return value address to edi.
+%           mov eax, 3      ; Use "read" system call.
+%           mov ebx, 0      ; Use standard input.
+%           pop ecx         ; Use the 'buf' argument as output address.
+%           pop edx         ; Use the 'size' argument as the maximum number of bytes to read.
+%           int 0x80        ; Perform the system call.
+%                           ; TODO: error handling
+%           mov [edi], eax  ; Save the number of read bytes to the return value address.
+%           jmp ebp         ; Return to the return address.
+%
+readStdin : ($5D5883F80375FE5FB803000000BB00000000595ACD808907FFE5)
+
 % Define put as an alias for the empty-name 32-bit memory write function.
 put : (0)
 (&put, )
@@ -88,5 +109,6 @@ not : ([ret, x]{ put(ret, eq(x, 0)) })
 and : ([ret, a, b]{ put(ret, not(add(not(a), not(b)))) })
 or : ([ret, a, b]{ put(ret, not(and(not(a), not(b)))) })
 
-put(brk, mul(sub(add(5, 1, 2), 3), sub(0, 2), sub(0, 2)))
-put(brk, or(4, 0))
+x : (0)
+y : readStdin(&x, 4)
+put(brk, x)
