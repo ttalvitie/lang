@@ -216,6 +216,25 @@ ifElse : ([cond, trueFunc, falseFunc]{
     })
     func()
 })
+while : ([condFunc, func]{
+    whileReturnsTrue([pContinue]{
+        ifElse(condFunc(), {
+            func()
+            put(pContinue, 1)
+        }, {
+            put(pContinue, 0)
+        })
+    })
+})
+
+% Input/output functions.
+writeStdout : ([buf, size]{
+    while([pContinue]{ put(pContinue, ne(size, 0)) }, {
+        written : writeSomeStdout(buf, size)
+        buf = add(buf, written)
+        size = sub(size, written)
+    })
+})
 
 % -----------------------------------------------------------------------------
 
@@ -239,4 +258,4 @@ whileReturnsTrue([pContinue]{
     put(pContinue, geq(c, 65))
 })
 put8(add(data, 26), 10)
-asd : writeSomeStdout(data, 27)
+writeStdout(data, 27)
