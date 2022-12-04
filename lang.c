@@ -186,8 +186,10 @@ int isStopCharacter(u8 character) {
 
 // Compile atomic expression (that is, expressions that remain after splitting the code at binary
 // operators). Reads up to the first character that is not a part of the atomic expression.
-// At the end of the emitted code, the expression value is stored in eax.
-void compileAtomicExpression() {
+// If the expression is an lvalue (can occur on the left side of an assignment operator), returns 1
+// and emits code at the end of which eax is the address of the expression value. Otherwise,
+// returns 0 and emits code at the end of which eax is the expression value.
+int compileAtomicExpression() {
     // Count the number of exclamation points in the beginning of the expression to count the number
     // of times we need to do logical negation to the result.
     int logNegCount = 0;
@@ -203,6 +205,8 @@ void compileAtomicExpression() {
         ++derefCount;
         readCh();
     }
+
+    int isLValue = 0;
 
     if(ch >= '0' && ch <= '9') {
         // Decimal literal.
@@ -223,9 +227,9 @@ void compileAtomicExpression() {
         // Variable or address of variable.
 
         // Detect whether we want the value of the address of the variable.
-        int addr = 0;
+        int isAddr = 0;
         if(ch == '&') {
-            addr = 1;
+            isAddr = 1;
             readCh();
         }
 
@@ -244,19 +248,23 @@ void compileAtomicExpression() {
         emitU8(0xA1);
         emitPtr(name->varBaseSlot);
 
-        if(addr) {
-            // add eax, 'name->varOffset': Set the expression value eax to the address of the variable.
-            emitU8(0x05);
-            emitU32(name->varOffset);
-        } else {
-            // mov eax, [eax+'name->varOffset']: Set the expression value eax to the value of the variable.
-            emitU8(0x8B);
-            emitU8(0x80);
-            emitU32(name->varOffset);
+        // add eax, 'name->varOffset': Set eax to the address of the variable.
+        emitU8(0x05);
+        emitU32(name->varOffset);
+
+        if(!isAddr) {
+            // If we are not taking the address of the variable, we have an lvalue and eax already
+            // points to its address.
+            isLValue = 1;
         }
     }
 
     // Dereference the result the requested number of times.
+    if(!isLValue && derefCount) {
+        // Dereference makes a non-lvalue expression value the address for an lvalue.
+        --derefCount;
+        isLValue = 1;
+    }
     while(derefCount) {
         // mov eax, [eax]: Dereference the pointer at eax and save the result back to eax.
         emitU8(0x8B);
@@ -266,6 +274,14 @@ void compileAtomicExpression() {
     }
 
     // Logically negate the result the requested number of times.
+    if(isLValue) {
+        // Logical negation destroys the lvalueness of the result.
+        isLValue = 0;
+
+        // mov eax, [eax]: Dereference the pointer at eax and save the result back to eax.
+        emitU8(0x8B);
+        emitU8(0x00);
+    }
     while(logNegCount) {
         // cmp eax, 0: Compare the result in eax to zero.
         emitU8(0x83);
@@ -283,11 +299,19 @@ void compileAtomicExpression() {
 
         --logNegCount;
     }
+
+    return isLValue;
 }
 
 // Stack of compileExpression helper functions ordered by precedence.
 void compileExpressionImpl1() {
-    compileAtomicExpression();
+    if(compileAtomicExpression()) {
+        // The result is an lvalue; we need to dereference it once to get the expression value.
+
+        // mov eax, [eax]: Dereference the pointer at eax and save the result back to eax.
+        emitU8(0x8B);
+        emitU8(0x00);
+    }
     if(ch == '=') {
         // Assignment operator.
         fail("TODO: implement");
