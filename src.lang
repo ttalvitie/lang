@@ -54,6 +54,25 @@ mul : ($5D5983F90074FE5BB8010000004983F90074055AF7E2EBF58903FFE5)
 %
 sub : ($5D5883F80375FE59585B29D88901FFE5)
 
+% =div(a, b): Return 'a' divided by 'b' rounded down. 'b' must be nonzero.
+%
+% Assembly source:
+%           pop ebp         ; Pop the return address to ebp.
+%           pop eax         ; Pop the number of arguments to eax.
+%           cmp eax, 3
+%   fail:   jne fail        ; If the number of arguments is not 3, loop forever. (TODO: better error handling)
+%           pop ecx         ; Pop the return value address to ecx.
+%           pop eax         ; Pop 'a' to eax.
+%           pop ebx         ; Pop 'b' to ebx.
+%           cmp ebx, 0
+%   fail2:  je fail2        ; If 'b' is 0, loop forever. (TODO: better error handling)
+%           mov edx, 0      ; Initialize edx to 0.
+%           div ebx         ; Compute eax divided by ebx to eax (dividend top bits in edx are 0; remainder is stored in eax).
+%   done:   mov [ecx], eax  ; Save the result to the return value address.
+%           jmp ebp         ; Return to the return address.
+%
+div : ($5D5883F80375FE59585B83FB0074FEBA00000000F7F38901FFE5)
+
 % =lt(a, b): Returns 1 if 'a' is less than 'b', and 0 otherwise.
 %
 % Assembly source:
@@ -227,6 +246,12 @@ while : ([condFunc, func]{
     })
 })
 
+% Math functions.
+rem : ([pRet, a, b]{
+    d : div(a, b)
+    put(pRet, sub(a, mul(d, b)))
+})
+
 % Input/output functions.
 writeStdout : ([buf, size]{
     while([pContinue]{ put(pContinue, ne(size, 0)) }, {
@@ -238,16 +263,7 @@ writeStdout : ([buf, size]{
 
 % -----------------------------------------------------------------------------
 
-factorial : ([pRet, n]{
-    ifElse(gt(n, 1), {
-        put(pRet, mul(n, factorial(sub(n, 1))))
-    }, {
-        put(pRet, 1)
-    })
-})
-
-val : factorial(7)
-put(brk, get8(&val))
+put(brk, rem(123, 7))
 
 brk = add(brk, 4)
 data : (brk)
