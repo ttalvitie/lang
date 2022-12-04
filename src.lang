@@ -140,16 +140,16 @@ put : (0)
 (&put, )
 
 % Comparison operators.
-eq : ([ret, a, b]{ put(ret, lt(sub(a, b), 1)) })
-ne : ([ret, a, b]{ put(ret, sub(1, eq(a, b))) })
-gt : ([ret, a, b]{ put(ret, lt(b, a)) })
-leq : ([ret, a, b]{ put(ret, sub(1, gt(a, b))) })
-geq : ([ret, a, b]{ put(ret, sub(1, lt(a, b))) })
+eq : ([pRet, a, b]{ put(pRet, lt(sub(a, b), 1)) })
+ne : ([pRet, a, b]{ put(pRet, sub(1, eq(a, b))) })
+gt : ([pRet, a, b]{ put(pRet, lt(b, a)) })
+leq : ([pRet, a, b]{ put(pRet, sub(1, gt(a, b))) })
+geq : ([pRet, a, b]{ put(pRet, sub(1, lt(a, b))) })
 
 % Logical operators.
-not : ([ret, x]{ put(ret, eq(x, 0)) })
-and : ([ret, a, b]{ put(ret, not(add(not(a), not(b)))) })
-or : ([ret, a, b]{ put(ret, not(and(not(a), not(b)))) })
+not : ([pRet, x]{ put(pRet, eq(x, 0)) })
+and : ([pRet, a, b]{ put(pRet, not(add(not(a), not(b)))) })
+or : ([pRet, a, b]{ put(pRet, not(and(not(a), not(b)))) })
 
 % Control flow functions.
 if : ([cond, func]{
@@ -164,6 +164,7 @@ if : ([cond, func]{
         })
     })
 })
+
 
 if(eq(5, 5), {
     y : writeSomeStdout($616263640A, 5)
