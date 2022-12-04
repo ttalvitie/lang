@@ -140,27 +140,27 @@ put : (0)
 (&put, )
 
 % Comparison operators.
-eq : ([pRet, a, b]{ put(pRet, lt(sub(a, b), 1)) })
-ne : ([pRet, a, b]{ put(pRet, sub(1, eq(a, b))) })
-gt : ([pRet, a, b]{ put(pRet, lt(b, a)) })
-leq : ([pRet, a, b]{ put(pRet, sub(1, gt(a, b))) })
-geq : ([pRet, a, b]{ put(pRet, sub(1, lt(a, b))) })
+eq : ([pRet, a, b]{ *pRet = lt(sub(a, b), 1) })
+ne : ([pRet, a, b]{ *pRet = sub(1, eq(a, b)) })
+gt : ([pRet, a, b]{ *pRet = lt(b, a) })
+leq : ([pRet, a, b]{ *pRet = sub(1, gt(a, b)) })
+geq : ([pRet, a, b]{ *pRet = sub(1, lt(a, b)) })
 
 % Logical operators.
-not : ([pRet, x]{ put(pRet, eq(x, 0)) })
-and : ([pRet, a, b]{ put(pRet, not(add(not(a), not(b)))) })
-or : ([pRet, a, b]{ put(pRet, not(and(not(a), not(b)))) })
+not : ([pRet, x]{ *pRet = eq(x, 0) })
+and : ([pRet, a, b]{ *pRet = not(add(not(a), not(b))) })
+or : ([pRet, a, b]{ *pRet = not(and(not(a), not(b))) })
 
 % Control flow functions.
 if : ([cond, func]{
     helper : ([pRet]{
-        put(pRet, cond)
+        *pRet = (cond)
     })
     whileReturnsTrue([pContinue]{
         put(pContinue, helper())
         helper = ([pRet]{
             func()
-            put(pRet, 0)
+            *pRet = (0)
         })
     })
 })
@@ -176,10 +176,12 @@ ifElse : ([cond, trueFunc, falseFunc]{
 
 factorial : ([pRet, n]{
     ifElse(gt(n, 1), {
-        put(pRet, mul(n, factorial(sub(n, 1))))
+        *pRet = mul(n, factorial(sub(n, 1)))
     }, {
-        put(pRet, 1)
+        *pRet = (1)
     })
 })
 
-put(brk, factorial(5))
+val : factorial(5)
+pVal : (&val)
+put(brk, *pVal)
