@@ -164,14 +164,22 @@ if : ([cond, func]{
         })
     })
 })
+ifElse : ([cond, trueFunc, falseFunc]{
+    func : (falseFunc)
+    if(cond, {
+        func = (trueFunc)
+    })
+    func()
+})
 
 % -----------------------------------------------------------------------------
 
 factorial : ([pRet, n]{
-    put(pRet, 1)
-    if(gt(n, 1), {
+    ifElse(gt(n, 1), {
         put(pRet, mul(n, factorial(sub(n, 1))))
+    }, {
+        put(pRet, 1)
     })
 })
 
-put(brk, factorial(10))
+put(brk, factorial(5))
