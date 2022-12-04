@@ -854,9 +854,6 @@ int main(int argc, char* argv[]) {
 
     u8* entryPoint = compile();
 
-    // TEST TODO REMOVE: Program will write output value to initial program break.
-    u8* outputSlot = memPos;
-
     // Compilation done; do not show source information in subsequent error messages.
     chHistoryShowOnError = 0;
 
@@ -868,9 +865,6 @@ int main(int argc, char* argv[]) {
     void (*entryPointFunc)() = (void(*)())entryPoint;
     __builtin___clear_cache(memStart, memEnd);
     entryPointFunc();
-
-    // TEST
-    printf("%u\n", *(u32*)outputSlot);
 
     return 0;
 }

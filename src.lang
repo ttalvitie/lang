@@ -260,18 +260,24 @@ writeStdout : ([buf, size]{
         size = sub(size, written)
     })
 })
+printDec : ([val]{
+    digit : rem(val, 10)
+    rest : div(val, 10)
+    if(rest, { printDec(rest) })
+    digit = add(digit, 48)
+    writeStdout(&digit, 1)
+})
+printStr : ([str]{
+    len : (0)
+    while([pContinue]{ put(pContinue, get8(add(str, len))) }, { len = add(len, 1) })
+    writeStdout(str, len)
+})
 
 % -----------------------------------------------------------------------------
 
-put(brk, rem(123, 7))
-
-brk = add(brk, 4)
-data : (brk)
-c : (90)
-whileReturnsTrue([pContinue]{
-    put8(add(data, sub(c, 65)), c)
-    c = sub(c, 1)
-    put(pContinue, geq(c, 65))
+i : (0)
+while([pContinue]{ put(pContinue, lt(i, 100)) }, {
+    printDec(i)
+    printStr($0A00)
+    i = add(i, 1)
 })
-put8(add(data, 26), 10)
-writeStdout(data, 27)
