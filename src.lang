@@ -165,7 +165,13 @@ if : ([cond, func]{
     })
 })
 
+% -----------------------------------------------------------------------------
 
-if(eq(5, 5), {
-    y : writeSomeStdout($616263640A, 5)
+factorial : ([pRet, n]{
+    put(pRet, 1)
+    if(gt(n, 1), {
+        put(pRet, mul(n, factorial(sub(n, 1))))
+    })
 })
+
+put(brk, factorial(10))
