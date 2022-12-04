@@ -79,7 +79,7 @@ void readRawCh() {
 void readCh() {
     do {
         readRawCh();
-        if(ch == '%') {
+        if(ch == '\'') {
             while(ch != '\n' && ch != 0) {
                 readRawCh();
             }
@@ -186,7 +186,18 @@ void compileStatementSequence(u8* varBaseSlot, u32 varOffset);
 // separator characters, parentheses, characters occurring in binary operators and end-of-file
 // special character 0).
 int isStopCharacter(u8 character) {
-    return character == '=' || character == '+' || character == '-' || character == ';' || character == '(' || character == ')' || character == '}' || character == 0;
+    return
+        character == '=' ||
+        character == '+' ||
+        character == '*' ||
+        character == '/' ||
+        character == '%' ||
+        character == '-' ||
+        character == ';' ||
+        character == '(' ||
+        character == ')' ||
+        character == '}' ||
+        character == 0;
 }
 
 // Helper function for expression compilation that checks whether *pIsLValue is nonzero and if it
@@ -323,9 +334,54 @@ int compileExpressionImpl6() {
     return compileAtomicExpression();
 }
 int compileExpressionImpl5() {
-    // Multiplication and division operator handling.
-    // TODO.
-    return compileExpressionImpl6();
+    // Multiplication and division/remainder operator handling.
+
+    int isLValue = compileExpressionImpl6();
+    while(ch == '*' || ch == '/' || ch == '%') {
+        u8 opCh = ch;
+
+        ensureNotLValue(&isLValue);
+
+        // push eax: Push the current value to the stack.
+        emitU8(0x50);
+
+        // Evaluate the next factor/divisor to eax.
+        readCh();
+        isLValue = compileExpressionImpl6();
+        ensureNotLValue(&isLValue);
+
+        // pop ebx: Pop the previous value to ebx.
+        emitU8(0x5B);
+
+        if(opCh == '*') {
+            // mul ebx: Multiply eax by ebx, saving the low bits of the result to eax (and high bits to edx).
+            emitU8(0xF7);
+            emitU8(0xE3);
+        } else {
+            // mov ecx, eax: Copy divisor from eax to ecx.
+            emitU8(0x89);
+            emitU8(0xC1);
+
+            // mov eax, ebx: Copy dividend from ebx to eax.
+            emitU8(0x89);
+            emitU8(0xD8);
+
+            // mov edx, 0: Initialize edx to zero.
+            emitU8(0xBA);
+            emitU32(0);
+
+            // div ecx: Divide dividend with low bits in eax and high bits set to zero in edx by divisor in ecx, saving quotient to eax and remainder to edx.
+            emitU8(0xF7);
+            emitU8(0xF1);
+
+            if(opCh == '%') {
+                // mov eax, edx: Copy remainder from edx to eax.
+                emitU8(0x89);
+                emitU8(0xD0);
+            }
+        }
+    }
+    return isLValue;
 }
 int compileExpressionImpl4() {
     // Addition and subtraction operator handling.
