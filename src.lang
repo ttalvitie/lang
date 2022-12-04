@@ -135,7 +135,7 @@ writeSomeStdout : ($5D5883F80375FE5FB804000000BB01000000595ACD8083F8017CFE8907FF
 %
 whileReturnsTrue : ($837C24040175FE89E083C004506A01FF542410837C24040075ED5883C408FFE0)
 
-% =get(addr): Read 32 bit-value from given address and return it.
+% =get(addr): Read 32-bit value from given address and return it.
 %
 % Assembly source:
 %           pop ebp         ; Pop the return address to ebp.
@@ -149,6 +149,22 @@ whileReturnsTrue : ($837C24040175FE89E083C004506A01FF542410837C24040075ED5883C40
 %           jmp ebp         ; Return to the retrun address.
 %
 get : ($5D5883F80275FE585B8B1B8918FFE5)
+
+% =get8(addr): Read 8-bit value from given address and return it.
+%
+% Assembly source:
+%           pop ebp         ; Pop the return address to ebp.
+%           pop eax         ; Pop the number of arguments to eax.
+%           cmp eax, 2
+%   fail:   jne fail        ; If the number of arguments is not 2, loop forever. (TODO: better error handling)
+%           pop eax         ; Pop the return value address to eax.
+%           pop ebx         ; Pop the address to read to ebx.
+%           mov ecx, 0      ; Initialize ecx to 0.
+%           mov cl, [ebx]   ; Read the value to the lowest byte of ecx.
+%           mov [eax], ecx  ; Copy the read value to the return value address.
+%           jmp ebp         ; Return to the retrun address.
+%
+get8 : ($5D5883F80275FE585BB9000000008A0B8908FFE5)
 
 % Define put as an alias for the empty-name 32-bit memory write function.
 put : (0)
@@ -197,5 +213,5 @@ factorial : ([pRet, n]{
     })
 })
 
-val : factorial(5)
-put(brk, get(&val))
+val : factorial(7)
+put(brk, get8(&val))
