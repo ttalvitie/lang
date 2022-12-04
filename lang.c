@@ -274,7 +274,7 @@ int compileAtomicExpression() {
     }
 
     // Logically negate the result the requested number of times.
-    if(isLValue) {
+    if(logNegCount && isLValue) {
         // Logical negation destroys the lvalueness of the result.
         isLValue = 0;
 
@@ -303,18 +303,40 @@ int compileAtomicExpression() {
     return isLValue;
 }
 
-// Stack of compileExpression helper functions ordered by precedence.
+// Stack of compileExpression helper functions ordered by precedence. (The ones returning int
+// return lvalueness similarly to createAtomicExpressions; others always set eax to the expression
+// value like compileExpression.)
 void compileExpressionImpl1() {
-    if(compileAtomicExpression()) {
-        // The result is an lvalue; we need to dereference it once to get the expression value.
+    // Assignment operator handling.
 
-        // mov eax, [eax]: Dereference the pointer at eax and save the result back to eax.
-        emitU8(0x8B);
-        emitU8(0x00);
-    }
+    int isLValue = compileAtomicExpression();
     if(ch == '=') {
         // Assignment operator.
-        fail("TODO: implement");
+
+        if(!isLValue) {
+            fail("Left side of assignment is not assignable");
+        }
+
+        // push eax: Push the assignment target address in eax to stack.
+        emitU8(0x50);
+
+        // Compile the rest of the expression (may contain other assignments).
+        readCh();
+        compileExpressionImpl1();
+
+        // pop ebx: Pop the assignment target address from the stack to ebx.
+        emitU8(0x5B);
+
+        // mov [ebx], eax: Write the expression value to be assigned to the assignment target address.
+        emitU8(0x89);
+        emitU8(0x03);
+    } else {
+        // No assignment; make sure that the eax contains the expression value.
+        if(isLValue) {
+            // mov eax, [eax]: Dereference the pointer at eax and save the result back to eax.
+            emitU8(0x8B);
+            emitU8(0x00);
+        }
     }
 }
 

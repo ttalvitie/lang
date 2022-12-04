@@ -1,4 +1,7 @@
-@xasd=1234213;
+@xasd=13;
 @yasd=&xasd;
-@zasd=&yasd;
-!!**zasd
+@zasd=0;
+@wasd=0;
+@qasd=0;
+wasd=zasd=qasd=&yasd;
+**zasd
