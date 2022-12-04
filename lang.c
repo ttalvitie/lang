@@ -186,6 +186,14 @@ int isStopCharacter(u8 character) {
 // Compile atomic expression (that is, expressions that remain after splitting the code at binary
 // operators). Reads up to the first character that is not a part of the atomic expression.
 void compileAtomicExpression() {
+    // Count the number of exclamation points in the beginning of the expression to count the number
+    // of times we need to do logical negation to the result.
+    int logNegCount = 0;
+    while(ch == '!') {
+        ++logNegCount;
+        readCh();
+    }
+
     // Count the number of stars in the beginning of the expression to count the number of times we
     // need to dereference the final result.
     int derefCount = 0;
@@ -253,6 +261,25 @@ void compileAtomicExpression() {
         emitU8(0x00);
 
         --derefCount;
+    }
+
+    // Logically negate the result the requested number of times.
+    while(logNegCount) {
+        // cmp eax, 0: Compare the result in eax to zero.
+        emitU8(0x83);
+        emitU8(0xF8);
+        emitU8(0x00);
+
+        // mov eax, 0: Initialize the result in eax to zero.
+        emitU8(0xB8);
+        emitU32(0);
+
+        // sete al: Set the lowest byte of eax to 1 if eax was nonzero in the comparison above.
+        emitU8(0x0F);
+        emitU8(0x94);
+        emitU8(0xC0);
+
+        --logNegCount;
     }
 }
 

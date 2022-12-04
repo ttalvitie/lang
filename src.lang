@@ -1,4 +1,4 @@
-@xasd=37;
+@xasd=0;
 @yasd=&xasd;
 @zasd=&yasd;
-**zasd
+!**zasd
