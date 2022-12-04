@@ -151,9 +151,20 @@ not : ([ret, x]{ put(ret, eq(x, 0)) })
 and : ([ret, a, b]{ put(ret, not(add(not(a), not(b)))) })
 or : ([ret, a, b]{ put(ret, not(and(not(a), not(b)))) })
 
-countdown : (5)
-whileReturnsTrue([ret]{
+% Control flow functions.
+if : ([cond, func]{
+    helper : ([pRet]{
+        put(pRet, cond)
+    })
+    whileReturnsTrue([pContinue]{
+        put(pContinue, helper())
+        helper = ([pRet]{
+            func()
+            put(pRet, 0)
+        })
+    })
+})
+
+if(eq(5, 5), {
     y : writeSomeStdout($616263640A, 5)
-    countdown = sub(countdown, 1)
-    put(ret, countdown)
 })
