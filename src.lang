@@ -300,29 +300,127 @@ printStr : ([str]{
     writeStdout(str, len)
 })
 
+printStrL : ([str]{
+    printStr(str)
+    printStr(endl)
+})
+
 % Change the fail implementation so that it prints the error message to stdout before going to
 % infinite loop.
 fail = ([msg]{
     printStr("FAIL: ")
-    printStr(msg)
-    printStr(endl)
+    printStrL(msg)
     runWhileTrue([pContinue]{ put(pContinue, 1) })
 })
 
-eof : sub(0, 1)
-
-% Read byte from standard input. If the end of the file has been reached, return eof.
-inputByte : ([pRet]{
-    put(pRet, 0)
-    count : readSomeStdin(pRet, 1)
-    if(eq(count, 0), {
-        put(pRet, eof)
+inputLine : ([pRet]{
+    put(pRet, brk)
+    runWhileTrue([pContinue]{
+        ch : (0)
+        count : readSomeStdin(&ch, 1)
+        ifElse(count, {
+            ifElse(eq(ch, #A), {
+                % Line break.
+                put(pContinue, 0)
+            }, {
+                % Append character to string.
+                put8(brk, ch)
+                brk = add(brk, 1)
+            })
+        }, {
+            % End of file.
+            put(pContinue, 0)
+        })
     })
+    % Append the null terminator.
+    put(brk, 0)
+    brk = add(brk, 1)
+})
+
+%--- String conversions ---%
+
+parseDec : ([pRet, str]{
+    val : (0)
+    while([pContinue]{ put(pContinue, get8(str)) }, {
+        ch : get8(str)
+        if(or(lt(ch, #30), gt(ch, #39)), {
+            fail("parseDec: Invalid digit")
+        })
+        val = mul(val, 10)
+        val = add(val, sub(ch, #30))
+        str = add(str, 1)
+    })
+    put(pRet, val)
 })
 
 %--------------------------------------------------------------------------------------------------%
 % PROGRAM                                                                                          %
 %--------------------------------------------------------------------------------------------------%
 
-printStr("TODO")
-printStr(endl)
+% Allocate array of total calories of top elves (initially zero).
+topCount : (3)
+bestCalories : ([pRet]{
+    array : (brk)
+    brk = add(brk, mul(4, topCount))
+    i : (0)
+    while([pContinue]{ put(pContinue, lt(i, topCount)) }, {
+        put(add(array, mul(4, i)), 0)
+        i = add(i, 1)
+    })
+    put(pRet, array)
+})
+bestCalories = bestCalories()
+
+runWhileTrue([pContinue1]{
+    itemsFound : (0)
+    totalCalories : (0)
+    runWhileTrue([pContinue2]{
+        line : inputLine()
+        ifElse(get8(line), {
+            % Nonempty line -> new item.
+            totalCalories = add(totalCalories, parseDec(line))
+            itemsFound = (1)
+            put(pContinue2, 1)
+        }, {
+            % Empty line -> end of item list for this elf.
+            put(pContinue2, 0)
+        })
+    })
+
+    ifElse(itemsFound, {
+        % Insert totalCalories to bestCalories.
+        i : (0)
+        runWhileTrue([pContinue]{
+            put(pContinue, 0)
+            if(lt(i, topCount), {
+                pItem : add(bestCalories, mul(4, i))
+                if(gt(totalCalories, get(pItem)), {
+                    if(i, {
+                        pPrevItem : add(bestCalories, mul(4, sub(i, 1)))
+                        put(pPrevItem, get(pItem))
+                    })
+                    put(pItem, totalCalories)
+                    put(pContinue, 1)
+                })
+            })
+            i = add(i, 1)
+        })
+
+        put(pContinue1, 1)
+    }, {
+        % No items found -> all elves processed.
+        put(pContinue1, 0)
+    })
+})
+
+printDec(get(add(bestCalories, mul(4, sub(topCount, 1)))))
+printStrL("")
+
+bestSum : (0)
+i : (0)
+while([pContinue]{ put(pContinue, lt(i, topCount)) }, {
+    bestSum = add(bestSum, get(add(bestCalories, mul(4, i))))
+    i = add(i, 1)
+})
+printDec(bestSum)
+printStrL("")
