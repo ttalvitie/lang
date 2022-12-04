@@ -1,9 +1,4 @@
-@xasd=13;
-@yasd=&xasd;
-@zasd=0;
-@wasd=0; % comments
-@qasd=0;
-wasd=za %do
-sd=qasd=&yasd;
-**zasd
-%work
+@x = 5;
+@y = 7;
+x = x + y - 3;
+x - 3

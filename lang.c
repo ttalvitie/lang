@@ -186,7 +186,19 @@ void compileStatementSequence(u8* varBaseSlot, u32 varOffset);
 // separator characters, parentheses, characters occurring in binary operators and end-of-file
 // special character 0).
 int isStopCharacter(u8 character) {
-    return character == '=' || character == ';' || character == '(' || character == ')' || character == '}' || character == 0;
+    return character == '=' || character == '+' || character == '-' || character == ';' || character == '(' || character == ')' || character == '}' || character == 0;
+}
+
+// Helper function for expression compilation that checks whether *pIsLValue is nonzero and if it
+// is, sets it to zero and emits code that dereferences eax and places the result back in eax.
+void ensureNotLValue(int* pIsLValue) {
+    if(*pIsLValue) {
+        *pIsLValue = 0;
+
+        // mov eax, [eax]: Dereference the pointer at eax and save the result back to eax.
+        emitU8(0x8B);
+        emitU8(0x00);
+    }
 }
 
 // Compile atomic expression (that is, expressions that remain after splitting the code at binary
@@ -279,13 +291,9 @@ int compileAtomicExpression() {
     }
 
     // Logically negate the result the requested number of times.
-    if(logNegCount && isLValue) {
+    if(logNegCount) {
         // Logical negation destroys the lvalueness of the result.
-        isLValue = 0;
-
-        // mov eax, [eax]: Dereference the pointer at eax and save the result back to eax.
-        emitU8(0x8B);
-        emitU8(0x00);
+        ensureNotLValue(&isLValue);
     }
     while(logNegCount) {
         // cmp eax, 0: Compare the result in eax to zero.
@@ -311,13 +319,62 @@ int compileAtomicExpression() {
 // Stack of compileExpression helper functions ordered by precedence. (The ones returning int
 // return lvalueness similarly to createAtomicExpressions; others always set eax to the expression
 // value like compileExpression.)
+int compileExpressionImpl6() {
+    return compileAtomicExpression();
+}
+int compileExpressionImpl5() {
+    // Multiplication and division operator handling.
+    // TODO.
+    return compileExpressionImpl6();
+}
+int compileExpressionImpl4() {
+    // Addition and subtraction operator handling.
+
+    int isLValue = compileExpressionImpl5();
+    while(ch == '+' || ch == '-') {
+        int isSubtraction = ch == '-';
+
+        ensureNotLValue(&isLValue);
+
+        // push eax: Push the current value to the stack.
+        emitU8(0x50);
+
+        // Evaluate the next term to eax.
+        readCh();
+        isLValue = compileExpressionImpl5();
+        ensureNotLValue(&isLValue);
+
+        if(isSubtraction) {
+            // neg eax: Negate the term.
+            emitU8(0xF7);
+            emitU8(0xD8);
+        }
+
+        // pop ebx: Pop the previous value to ebx.
+        emitU8(0x5B);
+
+        // add eax, ebx: Combine the results, saving the total to eax.
+        emitU8(0x01);
+        emitU8(0xD8);
+    }
+    return isLValue;
+}
+int compileExpressionImpl3() {
+    // Comparison operator handling.
+    // TODO.
+    return compileExpressionImpl4();
+}
+int compileExpressionImpl2() {
+    // Logical operator handling.
+    // TODO.
+    return compileExpressionImpl3();
+}
+
 void compileExpressionImpl1() {
     // Assignment operator handling.
 
-    int isLValue = compileAtomicExpression();
+    int isLValue = compileExpressionImpl2();
     if(ch == '=') {
-        // Assignment operator.
-
         if(!isLValue) {
             fail("Left side of assignment is not assignable");
         }
@@ -336,12 +393,7 @@ void compileExpressionImpl1() {
         emitU8(0x89);
         emitU8(0x03);
     } else {
-        // No assignment; make sure that the eax contains the expression value.
-        if(isLValue) {
-            // mov eax, [eax]: Dereference the pointer at eax and save the result back to eax.
-            emitU8(0x8B);
-            emitU8(0x00);
-        }
+        ensureNotLValue(&isLValue);
     }
 }
 
