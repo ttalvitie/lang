@@ -174,6 +174,156 @@ int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
     }
 }
 
+// Forward declarations needed for cyclic recursion.
+void compileStatementSequence(u8* varBaseSlot, u32 varOffset);
+
+// True for characters that end atomic expressions (e.g. statement and argument list separator
+// characters and characters occurring in binary operators, end-of-file special character 0).
+int isStopCharacter(u8 character) {
+    return character == ';' || character == 0;
+}
+
+// Compile atomic expression (that is, expressions that remain after splitting the code at binary
+// operators). Reads up to the first character that is not part of the atomic expression.
+void compileAtomicExpression() {
+    if(ch >= '0' && ch <= '9') {
+        // Decimal literal.
+        u32 val = 0;
+        while(!isStopCharacter(ch)) {
+            if(!(ch >= '0' && ch <= '9')) {
+                fail("Expected decimal digit");
+            }
+            val *= 10;
+            val += ch - '0';
+            readCh();
+        }
+
+        // mov eax, 'val': Set the expression value eax to 'val'.
+        emitU8(0xB8);
+        emitU32(val);
+    } else {
+        Name* name = &rootName;
+        while(!isStopCharacter(ch)) {
+            if(name != NULL && !extendName(ch, &name, NULL, NULL)) {
+                name = NULL;
+            }
+            readCh();
+        }
+        if(name == NULL || !name->hasVar) {
+            fail("Variable with given name does not exist");
+        }
+
+        // mov eax, ['name->varBaseSlot']: Write the base pointer of the function variable to eax.
+        emitU8(0xA1);
+        emitPtr(name->varBaseSlot);
+
+        // mov eax, [eax+'name->varOffset']: Set the expression value eax to the value of the variable.
+        emitU8(0x8B);
+        emitU8(0x80);
+        emitU32(name->varOffset);
+    }
+}
+
+// Compile expression. Reads up to the first character that is not part of the expression.
+void compileExpression() {
+    // TODO: implement binary operators.
+    compileAtomicExpression();
+}
+
+// Compile a single variable definition and then proceed to compile the rest of the statement
+// sequence using compileStatementSequence. 'name' is the already read prefix of the variable name.
+// The 'var*' arguments specify the base pointer slot and offset for creating new variables.
+void compileVariableDefinition(Name* name, u8* varBaseSlot, u32 varOffset) {
+    while(1) {
+        readCh();
+        if(ch == '=') {
+            // Assignment sign reached.
+
+            if(name->hasVar) {
+                fail("Variable with given name already exists");
+            }
+
+            // Add the variable to the stack frame and bring it to scope. We do this before
+            // compiling the expression to facilitate creating e.g. recursive functions.
+            name->hasVar = 1;
+            name->varBaseSlot = varBaseSlot;
+            varOffset -= 4;
+            name->varOffset = varOffset;
+
+            // push 0: Reserve space for the variable in the stack and initialize it to 0.
+            emitU8(0x6A);
+            emitU8(0x00);
+
+            // Compile the expression that computes the initial value for the variable to eax.
+            readCh();
+            compileExpression();
+
+            if(ch != ';') {
+                fail("Expected ';'");
+            }
+
+            // mov ebx, ['name->varBaseSlot']: Write the base pointer to ebx.
+            emitU8(0x8B);
+            emitU8(0x1D);
+            emitPtr(name->varBaseSlot);
+
+            // mov [ebx+'name->varOffset'], eax: Write the initial value in eax to the variable.
+            emitU8(0x89);
+            emitU8(0x83);
+            emitU32(name->varOffset);
+
+            // Compile the rest of the statements (they may use the created variable).
+            compileStatementSequence(varBaseSlot, varOffset);
+
+            // Now the variable is out of scope and should be removed.
+            name->hasVar = 0;
+
+            return;
+        } else {
+            // Extend the name by the read character, possibly adding a new node to the trie.
+            Name newNameNode;
+            Name** nameLink;
+            if(!extendName(ch, &name, &newNameNode, &nameLink)) {
+                // 'newNameNode' is now part of the trie, so we need to recurse to persist it.
+                compileVariableDefinition(name, varBaseSlot, varOffset);
+
+                // All variables created in the subtree of 'newNameNode' are now out of scope, so
+                // we can remove the node from the trie.
+                *nameLink = NULL;
+
+                return;
+            }
+        }
+    }
+}
+
+// Compile a sequence of one or more statements. Statements are either expressions or variable
+// definitions (at sign, variable name, equals sign and an expression). The last statement must be
+// an expression and its value will be stored in eax at the end of the emitted code.
+// The 'var*' arguments specify the base pointer slot and offset for creating new variables.
+void compileStatementSequence(u8* varBaseSlot, u32 varOffset) {
+    while(1) {
+        readCh();
+
+        if(ch == '@') {
+            compileVariableDefinition(&rootName, varBaseSlot, varOffset);
+
+            // compileVariableDefinition calls this function after defining the variable, so at
+            // this point the whole statement sequence is already compiled and we need to just
+            // return here.
+            return;
+        } else {
+            compileExpression();
+
+            if(ch != ';') {
+                // End of statement sequence (or a character that could not be parsed as a part of
+                // the expression; the caller will catch the error).
+                return;
+            }
+        }
+    }
+}
+
 // Compile the main function and return its entry point.
 u8* compileMainFunc() {
     // Create a base pointer slot for the main function.
@@ -182,9 +332,21 @@ u8* compileMainFunc() {
 
     u8* entryPoint = memPos;
 
-    // mov eax, 123: Set the return value (exit status) to 123.
-    emitU8(0xB8);
-    emitU32(123);
+    // mov ['baseSlot'], esp: Save the base pointer (stack pointer esp) to the base slot.
+    emitU8(0x89);
+    emitU8(0x25);
+    emitPtr(baseSlot);
+
+    compileStatementSequence(baseSlot, 0);
+
+    // mov esp, ['baseSlot']: Move the stack pointer to the base pointer position, discarding local variables.
+    emitU8(0x8B);
+    emitU8(0x25);
+    emitPtr(baseSlot);
+
+    if(ch != 0) {
+        fail("Unexpected character");
+    }
 
     // ret: Return.
     emitU8(0xC3);
@@ -302,7 +464,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Run the program.
-    int (*entryPointFunc)() = (void(*)())entryPoint;
+    int (*entryPointFunc)() = (int(*)())entryPoint;
     __builtin___clear_cache(memStart, memEnd);
     return entryPointFunc();
 }
