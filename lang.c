@@ -275,8 +275,8 @@ void compileCallArgument() {
         // mov ebx, 'val': Copy the argument value to ebx.
         emitU8(0xBB);
         emitU32(val);
-    } else if(ch == '$') {
-        // Binary string literal (in hexadecimal).
+    } else if(ch == '"' || ch == '$') {
+        // (Binary) string literal.
 
         // mov ebx, 'endPtr': Copy the address of the code after the binary string literal to ebx
         // (to be filled in after emitting the string).
@@ -292,21 +292,39 @@ void compileCallArgument() {
         u8* stringPtr = memPos;
 
         // Read and emit the bytes.
-        readCh();
-        while(ch != ',' && ch != ')') {
-            u8 byte = 0;
-            for(int i = 0; i < 2; ++i) {
-                byte *= 16;
-                if(ch >= '0' && ch <= '9') {
-                    byte += ch - '0';
-                } else if(ch >= 'A' && ch <= 'F') {
-                    byte += 10 + (ch - 'A');
-                } else {
-                    fail("Expected hexadecimal digit");
+        if(ch == '"') {
+            // String literal (null-terminated).
+            readRawCh();
+            while(ch != '"') {
+                if(ch == '\\') {
+                    readCh();
                 }
-                readCh();
+                emitU8(ch);
+                readRawCh();
             }
-            emitU8(byte);
+            readCh();
+            if(ch != ',' && ch != ')') {
+                fail("Expected ',' or ')'");
+            }
+            emitU8(0x00);
+        } else {
+            // Binary string literal (in hexadecimal).
+            readCh();
+            while(ch != ',' && ch != ')') {
+                u8 byte = 0;
+                for(int i = 0; i < 2; ++i) {
+                    byte *= 16;
+                    if(ch >= '0' && ch <= '9') {
+                        byte += ch - '0';
+                    } else if(ch >= 'A' && ch <= 'F') {
+                        byte += 10 + (ch - 'A');
+                    } else {
+                        fail("Expected hexadecimal digit");
+                    }
+                    readCh();
+                }
+                emitU8(byte);
+            }
         }
 
         // Fill in the address of the code after the binary string to the slot that was reserved

@@ -277,7 +277,9 @@ printStr : ([str]{
 
 i : (0)
 while([pContinue]{ put(pContinue, lt(i, 100)) }, {
+    printStr("i = \"")
     printDec(i)
-    printStr($0A00)
+    printStr("\"
+")
     i = add(i, 1)
 })
