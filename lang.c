@@ -177,14 +177,16 @@ int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
 // Forward declarations needed for cyclic recursion.
 void compileStatementSequence(u8* varBaseSlot, u32 varOffset);
 
-// True for characters that end atomic expressions (e.g. statement and argument list separator
-// characters, characters occurring in binary operators and end-of-file special character 0).
+// True for characters that can end literals or variable names (e.g. statement and argument list
+// separator characters, parentheses, characters occurring in binary operators and end-of-file
+// special character 0).
 int isStopCharacter(u8 character) {
-    return character == ';' || character == 0;
+    return character == '=' || character == ';' || character == '(' || character == ')' || character == '}' || character == 0;
 }
 
 // Compile atomic expression (that is, expressions that remain after splitting the code at binary
 // operators). Reads up to the first character that is not a part of the atomic expression.
+// At the end of the emitted code, the expression value is stored in eax.
 void compileAtomicExpression() {
     // Count the number of exclamation points in the beginning of the expression to count the number
     // of times we need to do logical negation to the result.
@@ -283,10 +285,19 @@ void compileAtomicExpression() {
     }
 }
 
-// Compile expression. Reads up to the first character that is not a part of the expression.
-void compileExpression() {
-    // TODO: implement binary operators.
+// Stack of compileExpression helper functions ordered by precedence.
+void compileExpressionImpl1() {
     compileAtomicExpression();
+    if(ch == '=') {
+        // Assignment operator.
+        fail("TODO: implement");
+    }
+}
+
+// Compile expression. Reads up to the first character that is not a part of the expression.
+// At the end of the emitted code, the expression value is stored in eax.
+void compileExpression() {
+    compileExpressionImpl1();
 }
 
 // Compile a single variable definition and then proceed to compile the rest of the statement
@@ -376,7 +387,8 @@ void compileStatementSequence(u8* varBaseSlot, u32 varOffset) {
 
             if(ch != ';') {
                 // End of statement sequence (or a character that could not be parsed as a part of
-                // the expression; the caller will catch the error).
+                // the expression; the caller will catch the error). The expression value is stored
+                // in eax.
                 return;
             }
         }
