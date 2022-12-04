@@ -397,18 +397,18 @@ void compileCallArgument() {
         } else {
             // Variable name or address.
 
-            // mov ebx, ['varName->varBaseSlot']: Copy the base pointer of the argument variable to eax.
+            // mov ebx, ['varName->varBaseSlot']: Copy the base pointer of the argument variable to ebx.
             emitU8(0x8B);
             emitU8(0x1D);
             emitPtr(varName->varBaseSlot);
 
             if(addr) {
-                // add ebx, 'varName->varOffset': Compute the variable address to eax.
+                // add ebx, 'varName->varOffset': Compute the variable address to ebx.
                 emitU8(0x81);
                 emitU8(0xC3);
                 emitU32(varName->varOffset);
             } else {
-                // mov ebx, [ebx+'varName->varOffset']: Copy the variable value to eax.
+                // mov ebx, [ebx+'varName->varOffset']: Copy the variable value to ebx.
                 emitU8(0x8B);
                 emitU8(0x9B);
                 emitU32(varName->varOffset);
