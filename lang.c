@@ -212,6 +212,82 @@ void ensureNotLValue(int* pIsLValue) {
     }
 }
 
+// Compile a body of function literal (assumes that all argCount arguments have already been added
+// to the name trie). Emits a jump that bypasses the function implementation and writes the
+// function pointer to eax.
+void compileFuncLiteral(u32 argCount) {
+    // mov ebx, 'endPtr': Write the address to the code after the function implementation to ebx
+    // (to be filled in after emitting the string).
+    emitU8(0xBB);
+    u8* endPtrSlot = memPos;
+    emitPtr(NULL);
+
+    // jmp ebx: Jump to the code after the function implementation.
+    emitU8(0xFF);
+    emitU8(0xE3);
+
+    // Create a base pointer slot for the function.
+    u8* baseSlot = memPos;
+    emitPtr(NULL);
+
+    u8* entryPoint = memPos;
+
+    // cmp eax, 'argCount': Compare the number of arguments (in eax) to 'argCount'.
+    emitU8(0x3D);
+    emitU32(argCount);
+
+    // x: jne x: If the number of arguments is not 'argCount', loop infinitely. (TODO: Better error handling)
+    emitU8(0x75);
+    emitU8(0xFE);
+
+    // push dword ['baseSlot']: Push the base pointer of the upper recursive call of this function to the stack.
+    emitU8(0xFF);
+    emitU8(0x35);
+    emitPtr(baseSlot);
+
+    // mov ['baseSlot'], esp: Save the base pointer (stack pointer esp) to the base slot.
+    emitU8(0x89);
+    emitU8(0x25);
+    emitPtr(baseSlot);
+
+    // Compile the function body. It will write the return value to eax (should not be clobbered).
+    compileStatementSequence(baseSlot, 0);
+    if(ch != '}') {
+        fail("Expected '}'");
+    }
+    readCh();
+
+    // mov esp, ['baseSlot']: Move the stack pointer to the base pointer position, discarding local variables.
+    emitU8(0x8B);
+    emitU8(0x25);
+    emitPtr(baseSlot);
+
+    // pop dword ['baseSlot']: Restore the base pointer of the upper recursive call of this function from the stack.
+    emitU8(0x8F);
+    emitU8(0x05);
+    emitPtr(baseSlot);
+
+    // pop ebx: Pop the return address to ebx.
+    emitU8(0x5B);
+
+    // add esp, '4 * argCount': Discard the arguments from the stack.
+    emitU8(0x81);
+    emitU8(0xC4);
+    emitU32(4 * argCount);
+
+    // jmp ebx: Return from the function by jumping to the return address stored in ebx.
+    emitU8(0xFF);
+    emitU8(0xE3);
+
+    // Fill in the address of the code after the function implementation to the slot that was
+    // reserved earlier.
+    writePtr(endPtrSlot, memPos);
+
+    // mov eax, 'entryPoint': Write the function pointer to eax.
+    emitU8(0xB8);
+    emitPtr(entryPoint);
+}
+
 // Compile atomic expression (that is, expressions that remain after splitting the code at binary
 // operators). Reads up to the first character that is not a part of the atomic expression.
 // If the expression is an lvalue (can occur on the left side of an assignment operator), returns 1
@@ -251,6 +327,15 @@ int compileAtomicExpression() {
         // mov eax, 'val': Set the expression value eax to 'val'.
         emitU8(0xB8);
         emitU32(val);
+    } else if(ch == '[' || ch == '{') {
+        // Function literal.
+        if(ch == '[') {
+            // Argument list.
+            fail("TODO: implement");
+        } else {
+            // No argument list.
+            compileFuncLiteral(0);
+        }
     } else {
         // Variable or address of variable.
 
@@ -285,6 +370,31 @@ int compileAtomicExpression() {
             // points to its address.
             isLValue = 1;
         }
+    }
+
+    // Allow calling the expression value as a function pointer (possibly multiple times).
+    while(ch == '(') {
+        readCh();
+        if(ch != ')') {
+            fail("TODO: implement call argument lists");
+        }
+        readCh();
+
+        ensureNotLValue(&isLValue);
+
+        // mov ebx, eax: Copy the function pointer in eax to ebx.
+        emitU8(0x89);
+        emitU8(0xC3);
+
+        // mov eax, 0: Set the number of arguments for the call to 0.
+        emitU8(0xB8);
+        emitU32(0);
+
+        // call ebx: Call the function pointer in ebx.
+        emitU8(0xFF);
+        emitU8(0xD3);
+
+        // The function return value is now stored in eax.
     }
 
     // Dereference the result the requested number of times.
@@ -613,7 +723,7 @@ u8* emitEntryPointGlue() {
     u8* mainFuncPtrSlot = memPos;
     emitPtr(NULL);
 
-    // mov eax, 0: Write the length of the argument list (zero) to eax.
+    // mov eax, 0: Write the number of arguments argument (zero) to eax.
     emitU8(0xB8);
     emitU32(0);
 
