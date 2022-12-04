@@ -1,3 +1,4 @@
-@xasd=34;
-@yasd=xasd;
-yasd
+@xasd=37;
+@yasd=&xasd;
+@zasd=&yasd;
+**zasd

@@ -178,14 +178,22 @@ int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
 void compileStatementSequence(u8* varBaseSlot, u32 varOffset);
 
 // True for characters that end atomic expressions (e.g. statement and argument list separator
-// characters and characters occurring in binary operators, end-of-file special character 0).
+// characters, characters occurring in binary operators and end-of-file special character 0).
 int isStopCharacter(u8 character) {
     return character == ';' || character == 0;
 }
 
 // Compile atomic expression (that is, expressions that remain after splitting the code at binary
-// operators). Reads up to the first character that is not part of the atomic expression.
+// operators). Reads up to the first character that is not a part of the atomic expression.
 void compileAtomicExpression() {
+    // Count the number of stars in the beginning of the expression to count the number of times we
+    // need to dereference the final result.
+    int derefCount = 0;
+    while(ch == '*') {
+        ++derefCount;
+        readCh();
+    }
+
     if(ch >= '0' && ch <= '9') {
         // Decimal literal.
         u32 val = 0;
@@ -202,6 +210,15 @@ void compileAtomicExpression() {
         emitU8(0xB8);
         emitU32(val);
     } else {
+        // Variable or address of variable.
+
+        // Detect whether we want the value of the address of the variable.
+        int addr = 0;
+        if(ch == '&') {
+            addr = 1;
+            readCh();
+        }
+
         Name* name = &rootName;
         while(!isStopCharacter(ch)) {
             if(name != NULL && !extendName(ch, &name, NULL, NULL)) {
@@ -217,14 +234,29 @@ void compileAtomicExpression() {
         emitU8(0xA1);
         emitPtr(name->varBaseSlot);
 
-        // mov eax, [eax+'name->varOffset']: Set the expression value eax to the value of the variable.
+        if(addr) {
+            // add eax, 'name->varOffset': Set the expression value eax to the address of the variable.
+            emitU8(0x05);
+            emitU32(name->varOffset);
+        } else {
+            // mov eax, [eax+'name->varOffset']: Set the expression value eax to the value of the variable.
+            emitU8(0x8B);
+            emitU8(0x80);
+            emitU32(name->varOffset);
+        }
+    }
+
+    // Dereference the result the requested number of times.
+    while(derefCount) {
+        // mov eax, [eax]: Dereference the pointer at eax and save the result back to eax.
         emitU8(0x8B);
-        emitU8(0x80);
-        emitU32(name->varOffset);
+        emitU8(0x00);
+
+        --derefCount;
     }
 }
 
-// Compile expression. Reads up to the first character that is not part of the expression.
+// Compile expression. Reads up to the first character that is not a part of the expression.
 void compileExpression() {
     // TODO: implement binary operators.
     compileAtomicExpression();
