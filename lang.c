@@ -48,7 +48,7 @@ FILE* src;
 // Character read from src using readRawCh or readCh. readRawCh reads the source character to ch
 // or 0 if all characters have been read (0 is not allowed in the source; reading more characters
 // after the end is an error). readCh calls readRawCh and repeats the calls until the read character
-// is not a space or newline.
+// is not a space or newline or part of a comment.
 u8 ch = '?';
 
 void readRawCh() {
@@ -79,6 +79,11 @@ void readRawCh() {
 void readCh() {
     do {
         readRawCh();
+        if(ch == '%') {
+            while(ch != '\n' && ch != 0) {
+                readRawCh();
+            }
+        }
     } while(ch == ' ' || ch == '\n');
 }
 
