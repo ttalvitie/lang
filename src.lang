@@ -102,19 +102,83 @@
     })
 };
 
+//--- Error handling (minimal implementations; replaced later) ---//
+
+// Fail the program with given error message string. Does not return.
+@fail = [msg]{
+    // Go to infinite loop.
+    runWhileTrue({ 1 })
+};
+
 //--- Input/output ---//
 
-//writeStdout = ([buf, size]{
+@writeStdout = [buf, size]{
+    while({ size }, {
+        @count = _writeSomeStdout(buf, size);
+        if(count == 0, {
+            fail("Writing to stdout failed")
+        });
+        buf = buf + count;
+        size = size - count
+    });
+    size
+};
 
-//})
+@printDec = [val]{
+    @digit = val % 10;
+    @rest = val / 10;
+    if(rest, { printDec(rest) });
+    digit = digit + 48;
+    writeStdout(&digit, 1)
+};
+
+@printStr = [str]{
+    @len = 0;
+    // TODO: implement proper 8-bit read
+    while({ *(str + len) % 256 }, { len = len + 1 });
+    writeStdout(str, len)
+};
+
+//--- Error handling (replacing earlier implementations) ---//
+
+fail = [msg]{
+    printStr("FAIL: ");
+    printStr(msg);
+    printStr("
+");
+
+    // Go to infinite loop.
+    runWhileTrue({ 1 })
+};
+
+// Replace the wrong number of arguments handler by one that prints the information to stdout.
+__builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenArgCount]{
+    printStr("FAIL: Wrong number of arguments given to function defined on line ");
+    printDec(line);
+    printStr(", column ");
+    printDec(column);
+    printStr(" (expected ");
+    printDec(correctArgCount);
+    printStr(" arguments, got ");
+    printDec(givenArgCount);
+    printStr(").
+");
+
+    // Go to infinite loop.
+    runWhileTrue({ 1 })
+};
 
 //------------------------------------------------------------------------------------------------//
 // PROGRAM                                                                                        //
 //------------------------------------------------------------------------------------------------//
 
-@i = 5;
+@i = 123;
 while({ i != 0 }, {
-    _writeSomeStdout("ASD
-", 4);
+    printStr("ASD ");
+    printDec(i);
+    printStr("
+");
     i = i - 1
-})
+});
+
+while(0)
