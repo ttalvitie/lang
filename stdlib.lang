@@ -55,6 +55,18 @@
 //
 @_readSomeStdin = $5D83F80275FEB803000000BB00000000595ACD8083F8007C02FFE5B8FFFFFFFFFFE5;
 
+// _exit(code): Exit with given code. Does not return.
+//
+// Implementation in NASM syntax:
+//          cmp eax, 1
+//  fail:   jne fail            ; If the number of arguments is not 1, loop forever.
+//          mov eax, 1          ; Use the "exit" system call.
+//          mov ebx, [esp+4]    ; Use 'code' as the exit code.
+//          int 0x80            ; Perform the system call.
+//  loop:   jmp loop            ; Go to infinite loop, just in case.
+//
+@_exit = $83F80175FEB8010000008B5C2404CD80EBFE;
+
 // _runWhileTrue(func): Call func repeatedly until it returns false (0).
 //
 // Implementation in NASM syntax:
@@ -157,18 +169,27 @@
     })
 };
 
-//--- Error handling (minimal implementations; replaced later) ---//
+//--- Error handling (minimal implementations; some are replaced later) ---//
 
-// Fail the program with given error message string. Does not return.
+@exit = [code]{
+    _exit(code)
+};
+
+// Fail the program with given error message string. Does not return; exits program.
 @fail = [msg]{
-    // Go to infinite loop.
-    runWhileTrue({ 1 })
+    exit(1)
 };
 
 //--- Strings ---//
 
 @endlStr = "
 ";
+
+@strLen = [str]{
+    @len = 0;
+    while({ get8(str + len) }, { len = len + 1 });
+    len
+};
 
 //--- Input/output ---//
 
@@ -214,9 +235,7 @@
 };
 
 @printStr = [str]{
-    @len = 0;
-    while({ get8(str + len) }, { len = len + 1 });
-    writeStdout(str, len)
+    writeStdout(str, strLen(str))
 };
 
 @printDecL = [val]{
@@ -263,8 +282,7 @@ fail = [msg]{
     printStr(msg);
     printStr(endlStr);
 
-    // Go to infinite loop.
-    runWhileTrue({ 1 })
+    exit(1)
 };
 
 // Replace the wrong number of arguments handler by one that prints the information to stdout.
@@ -307,6 +325,13 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
         fail("parseDec: The string is empty.")
     });
     val
+};
+
+@chr = [str]{
+    if(strLen(str) != 1, {
+        fail("chr: The length of given string is not 1")
+    });
+    get8(str)
 };
 
 //------------------------------------------------------------------------------------------------//
