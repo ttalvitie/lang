@@ -137,6 +137,26 @@
     })
 };
 
+@forRangeWhileTrue = [a, b, func]{
+    @i = a;
+    runWhileTrue({
+        ifElse(i < b, {
+            @ret = func(i);
+            i = i + 1;
+            ret
+        }, {
+            0
+        })
+    })
+};
+
+@forRange = [a, b, func]{
+    forRangeWhileTrue(a, b, [i]{
+        func(i);
+        1
+    })
+};
+
 //--- Error handling (minimal implementations; replaced later) ---//
 
 // Fail the program with given error message string. Does not return.
@@ -144,6 +164,11 @@
     // Go to infinite loop.
     runWhileTrue({ 1 })
 };
+
+//--- Strings ---//
+
+@endlStr = "
+";
 
 //--- Input/output ---//
 
@@ -194,6 +219,16 @@
     writeStdout(str, len)
 };
 
+@printDecL = [val]{
+    printDec(val);
+    printStr(endlStr)
+};
+
+@printStrL = [str]{
+    printStr(str);
+    printStr(endlStr)
+};
+
 @inputLine = {
     @ret = brk;
     runWhileTrue({
@@ -226,8 +261,7 @@
 fail = [msg]{
     printStr("FAIL: ");
     printStr(msg);
-    printStr("
-");
+    printStr(endlStr);
 
     // Go to infinite loop.
     runWhileTrue({ 1 })
@@ -243,8 +277,7 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     printDec(correctArgCount);
     printStr(" arguments, got ");
     printDec(givenArgCount);
-    printStr(").
-");
+    printStrL(").");
 
     // Go to infinite loop.
     runWhileTrue({ 1 })
@@ -280,9 +313,61 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
 // PROGRAM                                                                                        //
 //------------------------------------------------------------------------------------------------//
 
-printDec(parseDec(inputLine()));
-printStr("
-");
+// Allocate array of total calories of top elves (initially zero).
+@topCount = 3;
+@topCaloriesBuf = brk;
+brk = brk + 4 * topCount;
+@topCalories = [i]{
+    topCaloriesBuf + 4 * i
+};
+forRange(0, topCount, [i]{
+    *topCalories(i) = 0
+});
 
-// Exit status 0.
+runWhileTrue({
+    // Count the calories for this elf.
+    @totalCalories = 0;
+    @itemsFound = 0;
+    runWhileTrue({
+        @line = inputLine();
+        ifElse(get8(line), {
+            // Nonempty line -> new item.
+            totalCalories = totalCalories + parseDec(line);
+            itemsFound = 1;
+            1
+        }, {
+            // Empty line -> end of item list for this elf.
+            0
+        })
+    });
+
+    ifElse(itemsFound, {
+        // Insert totalCalories to bestCalories.
+        forRangeWhileTrue(0, topCount, [i]{
+            ifElse(totalCalories > *topCalories(i), {
+                if(i > 0, {
+                    *topCalories(i - 1) = *topCalories(i)
+                });
+                *topCalories(i) = totalCalories;
+                1
+            }, {
+                0
+            })
+        });
+        1
+    }, {
+        // No items found -> all elves processed.
+        0
+    })
+});
+
+printDecL(*topCalories(topCount - 1));
+
+@topCaloriesSum = 0;
+forRange(0, topCount, [i]{
+    topCaloriesSum = topCaloriesSum + *topCalories(i)
+});
+
+printDecL(topCaloriesSum);
+
 0
