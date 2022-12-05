@@ -16,7 +16,7 @@
 //      Write at least one and up to 'size' bytes from 'buf' to stdout. Returns the number of bytes
 //      written or zero if writing fails. 'size' must be nonzero.
 //
-// Assembly source:
+// Implementation in NASM syntax:
 //          pop ebp             ; Pop the return address to ebp.
 //          cmp eax, 2
 //  fail:   jne fail            ; If the number of arguments is not 2, loop forever.
@@ -33,10 +33,29 @@
 //
 @_writeSomeStdout = $5D83F80275FEB804000000BB01000000595ACD8083F8017C02FFE5B800000000FFE5;
 
+// _readSomeStdin(buf, size):
+//      Read up to 'size' bytes from stdin to 'buf'. Return the number of bytes read, or (0 - 1) if
+//      reading fails. 'size' must be nonzero. If 0 is returned, the end of the file has been
+//      reached.
+//
+// Implementation in NASM syntax:
+//          pop ebp             ; Pop the return address to ebp.
+//          cmp eax, 2
+//  fail:   jne fail            ; If the number of arguments is not 2, loop forever.
+//          mov eax, 3          ; Use the "read" system call.
+//          mov ebx, 0          ; Use standard input.
+//          pop ecx             ; Use the 'buf' argument as buffer address.
+//          pop edx             ; Use the 'size' argument as the maximum number of bytes to read.
+//          int 0x80            ; Perform the system call; return value is saved to eax.
+//          cmp eax, 0
+//          jl fail2            ; If an error occured (negative return value), jump to fail2.
+//          jmp ebp             ; Return to the return address (the number of bytes read is already in eax).
+//  fail2:  mov eax, -1         ; Set the return value to (0 - 1) to mark the error.
+//          jmp ebp             ; Return to the return address.
+@_readSomeStdin = $5D83F80275FEB803000000BB00000000595ACD8083F8007C02FFE5B8FFFFFFFFFFE5;
+
 //------------------------------------------------------------------------------------------------//
 // PROGRAM                                                                                        //
 //------------------------------------------------------------------------------------------------//
 
-_writeSomeStdout("Hello, world!
-", 14);
-123
+_readSomeStdin(brk, 30)
