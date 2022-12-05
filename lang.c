@@ -647,7 +647,7 @@ int compileExpressionImpl3() {
     // Comparison operator handling.
 
     int isLValue = compileExpressionImpl4();
-    if(ch == '=' || ch == '!') {
+    if(ch == '=' || ch == '!' || ch == '<' || ch == '>') {
         // We have a comparison expression; parse it as a comparison chain with short-circuiting.
 
         // push ['falseJumpPoint']: Push to the stack the address to jump to when comparison fails. ('falseJumpPoint' will be filled in later.)
@@ -655,20 +655,36 @@ int compileExpressionImpl3() {
         u8* falseJumpPointSlot = memPos;
         emitPtr(NULL);
 
-        while(ch == '=' || ch == '!') {
+        while(ch == '=' || ch == '!' || ch == '<' || ch == '>') {
             u8 firstCh = ch;
             readCh();
-            if(ch != '=') {
-                // Only a single '=' sign, so this is an assignment. Thus we need to put back the read
-                // character and return.
-                setPutBackCh('=');
-                break;
-            }
+
             u8 cmpInstruction;
-            if(firstCh == '!') {
-                cmpInstruction = 0x75; // Non-equality comparison jne.
+            if(ch == '=') {
+                if(firstCh == '=') {
+                    cmpInstruction = 0x74; // Equality comparison je.
+                } else if(firstCh == '!') {
+                    cmpInstruction = 0x75; // Non-equality comparison jne.
+                } else if(firstCh == '<') {
+                    cmpInstruction = 0x76; // Unsigned less-than-or-equal comparison jbe.
+                } else {
+                    cmpInstruction = 0x73; // Unsigned greater-than-or-equal comparison jbe.
+                }
             } else {
-                cmpInstruction = 0x74; // Equality comparison je.
+                // 'ch' is not part of the comparison operator, so we need to put it back.
+                setPutBackCh(firstCh);
+                if(firstCh == '=') {
+                    // Only a single '=' sign, so this is an assignment.
+                    break;
+                }
+
+                if(firstCh == '<') {
+                    cmpInstruction = 0x72; // Unsigned less-than comparison jb.
+                } else if(firstCh == '>') {
+                    cmpInstruction = 0x77; // Unsigned greater-than comparison ja.
+                } else {
+                    fail("Expected '='.");
+                }
             }
 
             ensureNotLValue(&isLValue);
