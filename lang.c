@@ -251,7 +251,7 @@ void compileFuncLiteral(u8* baseSlot, u32 argCount) {
     // Compile the function body. It will write the return value to eax (should not be clobbered).
     compileStatementSequence(baseSlot, 0);
     if(ch != '}') {
-        fail("Expected '}'");
+        fail("Expected '}'.");
     }
     readCh();
 
@@ -297,7 +297,7 @@ void compileFuncLiteralWithArgumentList(Name* name, u8* baseSlot, u32 argCount) 
             // Name completely read.
 
             if(name->hasVar) {
-                fail("A variable with given name already exists");
+                fail("A variable with given name already exists.");
             }
 
             // Add the variable.
@@ -311,7 +311,7 @@ void compileFuncLiteralWithArgumentList(Name* name, u8* baseSlot, u32 argCount) 
             if(ch == ']') {
                 readCh();
                 if(ch != '{') {
-                    fail("Expected '{'");
+                    fail("Expected '{'.");
                 }
                 compileFuncLiteral(baseSlot, argCount);
             } else {
@@ -369,7 +369,7 @@ int compileAtomicExpression() {
         u32 val = 0;
         while(!isStopCharacter(ch)) {
             if(!(ch >= '0' && ch <= '9')) {
-                fail("Expected decimal digit");
+                fail("Expected decimal digit.");
             }
             val *= 10;
             val += ch - '0';
@@ -413,7 +413,7 @@ int compileAtomicExpression() {
             readCh();
         }
         if(name == NULL || !name->hasVar) {
-            fail("Variable with given name does not exist");
+            fail("Variable with given name does not exist.");
         }
 
         // mov eax, ['name->varBaseSlot']: Write the base pointer of the function variable to eax.
@@ -452,7 +452,7 @@ int compileAtomicExpression() {
             while(1) {
                 compileExpression();
                 if(ch != ',' && ch != ')') {
-                    fail("Expected ',' or ')'");
+                    fail("Expected ',' or ')'.");
                 }
 
                 ++argCount;
@@ -634,7 +634,7 @@ void compileExpressionImpl1() {
     int isLValue = compileExpressionImpl2();
     if(ch == '=') {
         if(!isLValue) {
-            fail("Left side of assignment is not assignable");
+            fail("Left side of assignment is not assignable.");
         }
 
         // push eax: Push the assignment target address in eax to stack.
@@ -671,7 +671,7 @@ void compileVariableDefinition(Name* name, u8* varBaseSlot, u32 varOffset) {
             // Assignment sign reached.
 
             if(name->hasVar) {
-                fail("Variable with given name already exists");
+                fail("Variable with given name already exists.");
             }
 
             // Add the variable to the stack frame and bring it to scope. We do this before
@@ -690,7 +690,7 @@ void compileVariableDefinition(Name* name, u8* varBaseSlot, u32 varOffset) {
             compileExpression();
 
             if(ch != ';') {
-                fail("Expected ';'");
+                fail("Expected ';'.");
             }
 
             // mov ebx, ['name->varBaseSlot']: Write the base pointer to ebx.
@@ -777,7 +777,7 @@ u8* compileMainFunc() {
     emitPtr(baseSlot);
 
     if(ch != 0) {
-        fail("Unexpected character");
+        fail("Unexpected character.");
     }
 
     // ret: Return.
