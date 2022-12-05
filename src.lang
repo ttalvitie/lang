@@ -2,7 +2,7 @@
 // STANDARD LIBRARY                                                                               //
 //------------------------------------------------------------------------------------------------//
 
-//--- Basic boilerplate. ---//
+//--- Basic boilerplate ---//
 
 // Set the empty variable name to the identity function to allow parenthesization in expressions.
 @ = [x]{ x };
@@ -10,7 +10,7 @@
 // Store the start of the currently unreserved heap memory in the 'brk' variable.
 @brk = __builtin_initialProgramBreak;
 
-//--- Foundation functions implemented in machine code. ---//
+//--- Foundation functions implemented in machine code ---//
 
 // _writeSomeStdout(buf, size):
 //      Write at least one and up to 'size' bytes from 'buf' to stdout. Returns the number of bytes
@@ -70,12 +70,50 @@
 //
 @_runWhileTrue = $83F80175FEB800000000FF54240483F80075F25D83C404FFE5;
 
+//--- Control flow ---//
+
+@runWhileTrue = [func]{
+    _runWhileTrue(func)
+};
+
+@if = [cond, func]{
+    @helper = { cond };
+    runWhileTrue({
+        @continue = helper();
+        helper = {
+            func();
+            0
+        };
+        continue
+    })
+};
+
+@ifElse = [cond, trueFunc, falseFunc]{
+    @func = falseFunc;
+    if(cond, {
+        func = trueFunc
+    });
+    func()
+};
+
+@while = [condFunc, func]{
+    runWhileTrue({
+        ifElse(condFunc(), { func(); 1 }, { 0 })
+    })
+};
+
+//--- Input/output ---//
+
+//writeStdout = ([buf, size]{
+
+//})
+
 //------------------------------------------------------------------------------------------------//
 // PROGRAM                                                                                        //
 //------------------------------------------------------------------------------------------------//
 
 @i = 5;
-_runWhileTrue({
+while({ i != 0 }, {
     _writeSomeStdout("ASD
 ", 4);
     i = i - 1
