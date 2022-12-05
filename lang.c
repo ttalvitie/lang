@@ -445,6 +445,61 @@ int compileAtomicExpression() {
         // mov eax, 'val': Set the expression value eax to 'val'.
         emitU8(0xB8);
         emitU32(val);
+    } else if(ch == '"' || ch == '$') {
+        // (Binary) string literal.
+
+        // mov eax, 'endPtr': Copy the address of the code after the binary string literal to eax (to be filled in after emitting the string).
+        emitU8(0xB8);
+        u8* endPtrSlot = memPos;
+        emitPtr(NULL);
+
+        // jmp eax: Jump to the code after the binary string.
+        emitU8(0xFF);
+        emitU8(0xE0);
+
+        // Save the pointer to the start of the binary string.
+        u8* stringPtr = memPos;
+
+        // Read and emit the bytes.
+        if(ch == '"') {
+            // String literal (null-terminated).
+            readRawCh();
+            while(ch != '"') {
+                if(ch == '\\') {
+                    readCh();
+                }
+                emitU8(ch);
+                readRawCh();
+            }
+            readCh();
+            emitU8(0x00);
+        } else {
+            // Binary string literal (in hexadecimal).
+            readCh();
+            while(!isStopCharacter(ch)) {
+                u8 byte = 0;
+                for(int i = 0; i < 2; ++i) {
+                    byte *= 16;
+                    if(ch >= '0' && ch <= '9') {
+                        byte += ch - '0';
+                    } else if(ch >= 'A' && ch <= 'F') {
+                        byte += 10 + (ch - 'A');
+                    } else {
+                        fail("Expected hexadecimal digit");
+                    }
+                    readCh();
+                }
+                emitU8(byte);
+            }
+        }
+
+        // Fill in the address of the code after the binary string to the slot that was reserved
+        // earlier.
+        writePtr(endPtrSlot, memPos);
+
+        // mov eax, 'stringPtr': Copy the pointer to the start of the binary string to ebx.
+        emitU8(0xB8);
+        emitPtr(stringPtr);
     } else if(ch == '[' || ch == '{') {
         // Function literal.
 

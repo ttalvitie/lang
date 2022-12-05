@@ -1,4 +1,5 @@
 ' Set the empty variable name to the identity function to allow parenthesization in expressions.
 @ = [x]{ x };
 
-#1A
+@buf = $1A0000001B000000;
+*(buf + 4)
