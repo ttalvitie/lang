@@ -172,6 +172,11 @@ struct Name {
     Name* neighbor;
 };
 Name rootName;
+Name builtinNameNodes[64];
+
+// Addresses of builtin variables.
+u8* builtinInitialProgramBreakPtr;
+u8* builtinWrongNumberOfArgumentsHandlerPtr;
 
 // Advance *name in the name trie by appending 'newCh' to the end of the name. If this can be done
 // using the existing nodes, updates *name and returns 1. Otherwise, returns 0 and if 'newNode' is
@@ -258,9 +263,60 @@ void compileFuncLiteral(u8* baseSlot, u32 argCount) {
 
     u8* entryPoint = memPos;
 
+    // mov ebx, 'argCountCorrectJumpPoint': Write the jump point for the case where the number of arguments is correct to ebx. ('argCountCorrectJumpPoint' will be filled in later.)
+    emitU8(0xBB);
+    u8* argCountCorrectJumpPointSlot = memPos;
+    emitPtr(NULL);
+
     // cmp eax, 'argCount': Compare the number of arguments (in eax) to 'argCount'.
     emitU8(0x3D);
     emitU32(argCount);
+
+    // "je correct ; jmp incorrect ; correct: jmp ebx ; incorrect:": If the number of arguments is correct, jump to 'argCountCorrectJumpPoint' stored in ebx; otherwise continue.
+    emitU8(0x74);
+    emitU8(0x02);
+    emitU8(0xEB);
+    emitU8(0x02);
+    emitU8(0xFF);
+    emitU8(0xE3);
+
+    // If control reaches here, the number of arguments (stored in eax) is wrong. Let us call the
+    // handler function and then go to infinite loop.
+
+    // push eax: Push the number of arguments as the fourth argument.
+    emitU8(0x50);
+
+    // push 'argCount': Push the correct number of arguments as the third argument.
+    emitU8(0x68);
+    emitU32(argCount);
+
+    // push 'chColumn': Push the current column as the second argument.
+    emitU8(0x68);
+    emitU32((u32)chColumn);
+
+    // push 'chLine': Push the current line as the first argument.
+    emitU8(0x68);
+    emitU32((u32)chLine);
+
+    // mov eax, 4: Write the number of arguments (4) to eax.
+    emitU8(0xB8);
+    emitU32(4);
+
+    // mov ebx, ['builtinWrongNumberOfArgumentsHandlerPtr']: Read the handler function pointer to ebx.
+    emitU8(0x8B);
+    emitU8(0x1D);
+    emitPtr(builtinWrongNumberOfArgumentsHandlerPtr);
+
+    // call ebx: Call the handler function.
+    emitU8(0xFF);
+    emitU8(0xD3);
+
+    // x: jmp x: Loop infinitely.
+    emitU8(0xEB);
+    emitU8(0xFE);
+
+    // Fill in argCountCorrectJumpPoint.
+    writePtr(argCountCorrectJumpPointSlot, memPos);
 
     // x: jne x: If the number of arguments is not 'argCount', loop infinitely. (TODO: Better error handling)
     emitU8(0x75);
@@ -730,6 +786,16 @@ int compileExpressionImpl3() {
 
     int isLValue = compileExpressionImpl4();
     if(ch == '=' || ch == '!' || ch == '<' || ch == '>') {
+        if(ch == '=') {
+            readCh();
+            if(ch != '=') {
+                // Only a single '=' sign, so this is an assignment.
+                setPutBackCh('=');
+                return isLValue;
+            }
+            setPutBackCh('=');
+        }
+
         // We have a comparison expression; parse it as a comparison chain with short-circuiting.
 
         // push ['falseJumpPoint']: Push to the stack the address to jump to when comparison fails. ('falseJumpPoint' will be filled in later.)
@@ -755,10 +821,6 @@ int compileExpressionImpl3() {
             } else {
                 // 'ch' is not part of the comparison operator, so we need to put it back.
                 setPutBackCh(firstCh);
-                if(firstCh == '=') {
-                    // Only a single '=' sign, so this is an assignment.
-                    break;
-                }
 
                 if(firstCh == '<') {
                     cmpInstruction = 0x72; // Unsigned less-than comparison jb.
@@ -1056,6 +1118,90 @@ void compileStatementSequence(u8* varBaseSlot, u32 varOffset) {
     }
 }
 
+// Emit code for the default implementation for __builtin_wrongNumberOfArgumentsHandler which
+// does nothing.
+void emitDefaultWrongNumberOfArgumentsHandler() {
+    // pop ebp: Pop the return address from the stack.
+    emitU8(0x5D);
+
+    // shl eax, 2: Multiply the number of arguments stored in eax by 4.
+    emitU8(0xC1);
+    emitU8(0xE0);
+    emitU8(0x02);
+
+    // add esp, eax: Discard the arguments from the stack.
+    emitU8(0x01);
+    emitU8(0xC4);
+
+    // mov eax, 0: Set return value eax to zero.
+    emitU8(0xB8);
+    emitU32(0);
+
+    // jmp ebp: Return by jumping to the return address.
+    emitU8(0xFF);
+    emitU8(0xE5);
+}
+
+// Emit a 4-byte builtin variable with given value, and add it to the name trie with given name
+// relative to given base slot that must contain pointer to itself. Allocates trie nodes from
+// builtinNameNodes starting from *pNextNodeIdx.
+void initBuiltinVariable(const char* nameStr, u8* value, u8* baseSlot, size_t* pNextNodeIdx) {
+    Name* name = &rootName;
+    while(*nameStr != '\0') {
+        if(*pNextNodeIdx >= sizeof(builtinNameNodes) / sizeof(builtinNameNodes[0])) {
+            fail("Internal compiler error: the builtinNameNodes array is too small.");
+        }
+        Name** nameLink;
+        if(!extendName((u8)*nameStr++, &name, &builtinNameNodes[*pNextNodeIdx], &nameLink)) {
+            // New node allocated, advance node index.
+            ++*pNextNodeIdx;
+        }
+    }
+
+    if(name->hasVar) {
+        fail("Internal compiler error: duplicate builtin name.");
+    }
+    name->hasVar = 1;
+    name->varBaseSlot = baseSlot;
+    name->varOffset = (u32)(memPos - baseSlot);
+
+    emitPtr(value);
+}
+
+// Emits builtin variables/functions, initializing the name trie under rootName and the the global
+// builtin*Ptr variables.
+void initBuiltins() {
+    // Emit builtin function implementations:
+    u8* defaultWrongNumberOfArgumentsHandlerEntryPoint = memPos;
+    emitDefaultWrongNumberOfArgumentsHandler();
+
+    // Create a base pointer slot for builtin variables that contains its own address; thus we can
+    // reference the variables with offsets 4, 8, ...
+    u8* baseSlot = memPos;
+    emitPtr(baseSlot);
+
+    // Initialize the name trie.
+    rootName.lastCh = 0;
+    rootName.hasVar = 0;
+    rootName.successor = NULL;
+    rootName.neighbor = NULL;
+
+    // Start adding builtin variables.
+    size_t nextNodeIdx = 0;
+
+    // Initial program break (where the program can start allocating memory). Will be filled in later.
+    builtinInitialProgramBreakPtr = memPos;
+    initBuiltinVariable("__builtin_initialProgramBreak", NULL, baseSlot, &nextNodeIdx);
+
+    // Function called by all function literal implementations if the number of arguments is wrong
+    // before going to infinite loop. Takes four arguments: the line and column where the function
+    // is defined, the correct number of arguments and the given number of arguments. The default
+    // implementation does nothing; the program can override it to e.g. print an error message or
+    // exit the program.
+    builtinWrongNumberOfArgumentsHandlerPtr = memPos;
+    initBuiltinVariable("__builtin_wrongNumberOfArgumentsHandler", defaultWrongNumberOfArgumentsHandlerEntryPoint, baseSlot, &nextNodeIdx);
+}
+
 // Compile the main function and return its entry point.
 u8* compileMainFunc() {
     // Create a base pointer slot for the main function.
@@ -1156,20 +1302,21 @@ u8* emitEntryPointGlue() {
 }
 
 u8* compile() {
-    // Initialize the name trie.
-    rootName.hasVar = 0;
-    rootName.successor = NULL;
-    rootName.neighbor = NULL;
-
     // Emit glue code that will forward the call from the C program to our compiled main function.
     u8* entryPoint = memPos;
     u8* mainFuncPtrSlot = emitEntryPointGlue();
+
+    // Initialize the name trie and the builtin variables.
+    initBuiltins();
 
     // Compile the source code as the main function.
     u8* mainFunc = compileMainFunc();
 
     // Fill in the address to the main function call in the entry point glue code.
     writePtr(mainFuncPtrSlot, mainFunc);
+
+    // Fill in the initial program break position.
+    writePtr(builtinInitialProgramBreakPtr, memPos);
 
     return entryPoint;
 }

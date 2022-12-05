@@ -1,5 +1,23 @@
+'--------------------------------------------------------------------------------------------------'
+' STANDARD LIBRARY                                                                                 '
+'--------------------------------------------------------------------------------------------------'
+
+'--- Basic boilerplate. ---'
+
 ' Set the empty variable name to the identity function to allow parenthesization in expressions.
 @ = [x]{ x };
 
-@buf = $1A0000001B000000;
-*(buf + 4)
+' Store the start of the currently unreserved heap memory in the 'brk' variable.
+@brk = __builtin_initialProgramBreak;
+
+'--------------------------------------------------------------------------------------------------'
+' PROGRAM                                                                                          '
+'--------------------------------------------------------------------------------------------------'
+
+__builtin_wrongNumberOfArgumentsHandler = [x, y, z, w]{
+    @ptr = 0;
+    *ptr = 5;
+};
+
+@func = [x, y]{ 5 };
+func(6, 7, 8)
