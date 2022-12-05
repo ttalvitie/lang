@@ -53,6 +53,21 @@ FILE* src;
 u8 ch = '?';
 u8 putBackCh = 0;
 
+// Convenience function for putting back character 'prevCh' that was read prior to the current
+// character: checks that there is no already put back character and the current current character
+// is not zero, and makes 'prevCh' the currently read character and the currently read character
+// the next character to be read.
+void setPutBackCh(char prevCh) {
+    if(ch == 0) {
+        fail("Expected character.");
+    }
+    if(putBackCh != 0) {
+        fail("Internal compiler error: could not put back read character.");
+    }
+    putBackCh = ch;
+    ch = prevCh;
+}
+
 void readRawCh() {
     if(putBackCh != 0) {
         ch = putBackCh;
@@ -87,27 +102,20 @@ void readRawCh() {
 void readCh() {
     do {
         readRawCh();
-        if(ch == '\'') {
-            while(ch != '\n' && ch != 0) {
-                readRawCh();
+        if(ch == '/') {
+            // Ignore comments starting with "//" and ending in newline.
+            readRawCh();
+            if(ch != '/') {
+                // Not a comment; put read character back.
+                setPutBackCh('/');
+            } else {
+                // Comment; read until newline or end of file.
+                while(ch != '\n' && ch != 0) {
+                    readRawCh();
+                }
             }
         }
     } while(ch == ' ' || ch == '\n');
-}
-
-// Convenience function for putting back character 'prevCh' that was read prior to the current
-// character: checks that there is no already put back character and the current current character
-// is not zero, and makes 'prevCh' the currently read character and the currently read character
-// the next character to be read.
-void setPutBackCh(char prevCh) {
-    if(ch == 0) {
-        fail("Expected character.");
-    }
-    if(putBackCh != 0) {
-        fail("Internal compiler error: could not put back read character.");
-    }
-    putBackCh = ch;
-    ch = prevCh;
 }
 
 const size_t memSize = (size_t)1 << 22;
