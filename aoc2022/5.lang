@@ -1,0 +1,137 @@
+@line = inputLine();
+@n = (strLen(line) + 1) / 4;
+
+@Node_alloc = {
+    @ret = brk;
+    brk = brk + 8;
+    ret
+};
+@Node_ch = [node]{ node };
+@Node_link = [node]{ node + 4 };
+
+@stacks1Buf = brk;
+@stacks1 = [i]{ stacks1Buf + 4 * i };
+brk = stacks1(n + 1);
+@stacks2Buf = brk;
+@stacks2 = [i]{ stacks2Buf + 4 * i };
+brk = stacks2(n + 1);
+
+forRange(1, n + 1, [i]{
+    *stacks1(i) = *stacks2(i) = 0
+});
+
+@addCrate = [i, ch, stacks]{
+    @node = Node_alloc();
+    *Node_ch(node) = ch;
+    *Node_link(node) = *stacks(i);
+    *stacks(i) = node
+};
+
+runWhileTrue({
+    if(strLen(line) != 4 * n - 1, {
+        fail("Unexpected line length")
+    });
+    @cratesFound = 0;
+    forRange(1, n + 1, [i]{
+        @ch = get8(line + 4 * i - 3);
+        ifElse(charNum("A") <= ch <= charNum("Z"), {
+            addCrate(i, ch, stacks1);
+            addCrate(i, ch, stacks2);
+            cratesFound = 1
+        }, {
+            if(!(charNum("0") <= ch <= charNum("9") || ch == charNum(" ")), {
+                fail("Unexpected character")
+            })
+        })
+    });
+    line = inputLine();
+    cratesFound
+});
+
+if(strLen(line) != 0, {
+    fail("Unexpected non-empty line")
+});
+
+@flipStack = [old]{
+    @new = 0;
+    while({ old }, {
+        @node = old;
+        old = *Node_link(node);
+        *Node_link(node) = new;
+        new = node
+    });
+    new
+};
+forRange(1, n + 1, [i]{
+    *stacks1(i) = flipStack(*stacks1(i));
+    *stacks2(i) = flipStack(*stacks2(i))
+});
+
+@consumeStr = [pStr, expected]{
+    while({ get8(expected) }, {
+        if(get8(*pStr) != get8(expected), {
+            fail("consumeStr: Strings do not match")
+        });
+        *pStr = *pStr + 1;
+        expected = expected + 1
+    })
+};
+@splitAt = [pLine, splitCh]{
+    @ret = *pLine;
+    while({ @ch = get8(*pLine); ch != splitCh && ch != 0 }, { *pLine = *pLine + 1 });
+    put8(*pLine, 0);
+    *pLine = *pLine + 1;
+    ret
+};
+
+runWhileTrue({
+    line = inputLine();
+    ifElse(get8(line), {
+        consumeStr(&line, "move ");
+        @count = parseDec(splitAt(&line, charNum(" ")));
+        consumeStr(&line, "from ");
+        @src = parseDec(splitAt(&line, charNum(" ")));
+        consumeStr(&line, "to ");
+        @dest = parseDec(line);
+
+        forRange(0, count, [rep]{
+            @node = *stacks1(src);
+            if(!node, { fail("No crates in source stack") });
+            *stacks1(src) = *Node_link(node);
+            *Node_link(node) = *stacks1(dest);
+            *stacks1(dest) = node
+        });
+
+        if(count, {
+            @top = *stacks2(src);
+            @bottom = top;
+            forRange(0, count - 1, [rep]{
+                if(!bottom, { fail("Not enough crates in source stack") });
+                bottom = *Node_link(bottom)
+            });
+            if(!bottom, { fail("Not enough crates in source stack") });
+            *stacks2(src) = *Node_link(bottom);
+            *Node_link(bottom) = *stacks2(dest);
+            *stacks2(dest) = top
+        });
+
+        1
+    }, {
+        // End of input.
+        0
+    })
+});
+
+@printMsg = [stacks]{
+    forRange(1, n + 1, [i]{
+        if(!*stacks(i), { fail("Stack is empty") });
+        @ch = *Node_ch(*stacks(i));
+        printStr(&ch)
+    });
+    printStrL("")
+};
+
+printMsg(stacks1);
+printMsg(stacks2);
+
+0

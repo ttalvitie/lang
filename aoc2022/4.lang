@@ -10,9 +10,9 @@
 @overlapCount = 0;
 
 @processLine = [line]{
-    @a = parseDec(splitAt(&line, chr("-")));
-    @b = parseDec(splitAt(&line, chr(",")));
-    @c = parseDec(splitAt(&line, chr("-")));
+    @a = parseDec(splitAt(&line, charNum("-")));
+    @b = parseDec(splitAt(&line, charNum(",")));
+    @c = parseDec(splitAt(&line, charNum("-")));
     @d = parseDec(line);
 
     if((a <= c <= d <= b) || (c <= a <= b <= d), {

@@ -9,8 +9,8 @@ runWhileTrue({
             fail("Unexpected line length.")
         });
 
-        @opponentPlay = get8(line) - chr("A");
-        @myPlay = get8(line + 2) - chr("X");
+        @opponentPlay = get8(line) - charNum("A");
+        @myPlay = get8(line + 2) - charNum("X");
 
         if(opponentPlay >= 3 || myPlay >= 3, {
             fail("Unexpected input data")

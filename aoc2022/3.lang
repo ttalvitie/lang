@@ -14,13 +14,13 @@ brk = brk + 4 * 256;
 @sum2 = 0;
 
 @computePrio = [item]{
-    ifElse(chr("a") <= item <= chr("z"), {
-        item - chr("a") + 1
+    ifElse(charNum("a") <= item <= charNum("z"), {
+        item - charNum("a") + 1
     }, {
-        if(!(chr("A") <= item <= chr("Z")), {
+        if(!(charNum("A") <= item <= charNum("Z")), {
             fail("Invalid item")
         });
-        item - chr("A") + 27
+        item - charNum("A") + 27
     })
 };
 
