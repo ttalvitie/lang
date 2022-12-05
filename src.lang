@@ -124,6 +124,27 @@
     size
 };
 
+@readStdin = [buf, size]{
+    @ret = 0;
+    while({ size }, {
+        @count = _readSomeStdin(buf, size);
+        if(count == 0 - 1, {
+            fail("Reading from stdin failed")
+        });
+        ifElse(count, {
+            buf = buf + count;
+            size = size - count;
+            ret = ret + count
+        }, {
+            // End of file encountered, stop reading.
+            size = 0
+        })
+    });
+
+    // Return the number of bytes read (may be short if the end of the file is encountered).
+    ret
+};
+
 @printDec = [val]{
     @digit = val % 10;
     @rest = val / 10;
@@ -137,6 +158,35 @@
     // TODO: implement proper 8-bit read
     while({ *(str + len) % 256 }, { len = len + 1 });
     writeStdout(str, len)
+};
+
+@inputLine = {
+    @ret = brk;
+    runWhileTrue({
+        @ch = 0;
+        ifElse(readStdin(&ch, 1), {
+            ifElse(ch == #A, {
+                // Line break encountered.
+                0
+            }, {
+                // Append character to string and continue.
+                // TODO: implement proper 8-bit write.
+                *brk = ch;
+                brk = brk + 1;
+                1
+            })
+        }, {
+            // End of file encountered.
+            0
+        })
+    });
+
+    // Append the null terminator.
+    // TODO: implement proper 8-bit write.
+    *brk = 0;
+    brk = brk + 1;
+
+    ret
 };
 
 //--- Error handling (replacing earlier implementations) ---//
@@ -153,7 +203,7 @@ fail = [msg]{
 
 // Replace the wrong number of arguments handler by one that prints the information to stdout.
 __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenArgCount]{
-    printStr("FAIL: Wrong number of arguments given to function defined on line ");
+    printStr("FAIL: Wrong number of arguments passed to the function defined on line ");
     printDec(line);
     printStr(", column ");
     printDec(column);
@@ -181,4 +231,6 @@ while({ i != 0 }, {
     i = i - 1
 });
 
-while(0)
+printStr(inputLine());
+printStr("
+")
