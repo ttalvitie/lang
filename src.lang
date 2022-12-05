@@ -218,19 +218,40 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     runWhileTrue({ 1 })
 };
 
+//--- String conversions ---//
+
+@parseDec = [str]{
+    @val = 0;
+    @empty = 1;
+    runWhileTrue({
+        // TODO: implement proper 8-bit read
+        @ch = *str % 256;
+        ifElse(ch, {
+            empty = 0;
+            if(!(#30 <= ch <= #39), {
+                fail("parseDec: Invalid decimal digit.")
+            });
+            val = 10 * val + (ch - #30);
+            str = str + 1;
+            1
+        }, {
+            // End of string.
+            0
+        })
+    });
+    if(empty, {
+        fail("parseDec: The string is empty.")
+    });
+    val
+};
+
 //------------------------------------------------------------------------------------------------//
 // PROGRAM                                                                                        //
 //------------------------------------------------------------------------------------------------//
 
-@i = 123;
-while({ i != 0 }, {
-    printStr("ASD ");
-    printDec(i);
-    printStr("
-");
-    i = i - 1
-});
-
-printStr(inputLine());
+printDec(parseDec(inputLine()));
 printStr("
-")
+");
+
+// Exit status 0.
+0
