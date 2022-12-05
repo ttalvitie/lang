@@ -287,9 +287,57 @@ void compileFuncLiteral(u8* baseSlot, u32 argCount) {
 }
 
 // Read argument list of a function literal, defining the argument variables to the trie, compiling
-// the function body using compileFuncLiteral and then undefining the argument variables.
-void compileFuncLiteralWithArgumentList(u8* baseSlot, Name* name, u32 argCount) {
-    fail("TODO");
+// the function body using compileFuncLiteral and then undefining the argument variables. Recursive
+// implementation; 'name' is the currently read name prefix, 'argCount' is the number of fully read
+// argument names so far.
+void compileFuncLiteralWithArgumentList(Name* name, u8* baseSlot, u32 argCount) {
+    while(1) {
+        readCh();
+        if(ch == ',' || ch == ']') {
+            // Name completely read.
+
+            if(name->hasVar) {
+                fail("A variable with given name already exists");
+            }
+
+            // Add the variable.
+            name->hasVar = 1;
+            name->varBaseSlot = baseSlot;
+            name->varOffset = 4 * (argCount + 2); // Skip old base pointer and return address; see compileFuncLiteral implementation.
+            ++argCount;
+
+            // Proceed either recursively to the rest of the argument list or to compiling the
+            // function body.
+            if(ch == ']') {
+                readCh();
+                if(ch != '{') {
+                    fail("Expected '{'");
+                }
+                compileFuncLiteral(baseSlot, argCount);
+            } else {
+                compileFuncLiteralWithArgumentList(&rootName, baseSlot, argCount);
+            }
+
+            // At this point, the whole function literal is compiled and the variable is out of
+            // scope. Thus we remove it and return.
+            name->hasVar = 0;
+            return;
+        } else {
+            // Extend the name by the read character, possibly adding a new node to the trie.
+            Name newNameNode;
+            Name** nameLink;
+            if(!extendName(ch, &name, &newNameNode, &nameLink)) {
+                // 'newNameNode' is now part of the trie, so we need to recurse to persist it.
+                compileFuncLiteralWithArgumentList(name, baseSlot, argCount);
+
+                // At this point, the whole function literal is compiled and all the variables in
+                // the subtree of 'newNameNode' are out of scope, so we can remove the node from
+                // the trie and retun.
+                *nameLink = NULL;
+                return;
+            }
+        }
+    }
 }
 
 // Compile atomic expression (that is, expressions that remain after splitting the code at binary
@@ -342,7 +390,7 @@ int compileAtomicExpression() {
 
         if(ch == '[') {
             // Argument list.
-            compileFuncLiteralWithArgumentList(baseSlot, &rootName, 0);
+            compileFuncLiteralWithArgumentList(&rootName, baseSlot, 0);
         } else {
             // No argument list.
             compileFuncLiteral(baseSlot, 0);
