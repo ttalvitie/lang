@@ -1,0 +1,36 @@
+@splitAt = [pLine, splitCh]{
+    @ret = *pLine;
+    while({ @ch = get8(*pLine); ch != splitCh && ch != 0 }, { *pLine = *pLine + 1 });
+    put8(*pLine, 0);
+    *pLine = *pLine + 1;
+    ret
+};
+
+@fullyContainedCount = 0;
+@overlapCount = 0;
+
+@processLine = [line]{
+    @a = parseDec(splitAt(&line, chr("-")));
+    @b = parseDec(splitAt(&line, chr(",")));
+    @c = parseDec(splitAt(&line, chr("-")));
+    @d = parseDec(line);
+
+    if((a <= c <= d <= b) || (c <= a <= b <= d), {
+        fullyContainedCount = fullyContainedCount + 1
+    });
+    if(!(b < c || d < a), {
+        overlapCount = overlapCount + 1
+    });
+
+    0
+};
+
+runWhileTrue({
+    @line = inputLine();
+    ifElse(get8(line), { processLine(line); 1 }, { 0 })
+});
+
+printDecL(fullyContainedCount);
+printDecL(overlapCount);
+
+0
