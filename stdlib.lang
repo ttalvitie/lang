@@ -108,6 +108,70 @@
 //
 @_put8 = $5D83F80275FE5B59880BB800000000FFE5;
 
+// _bitAnd(a, b): Compute the bitwise AND of 'a' and 'b'.
+//
+// Implementation in NASM syntax:
+//          pop ebp             ; Pop the return address to ebp.
+//          cmp eax, 2
+//  fail:   jne fail            ; If the number of arguments is not 2, loop forever.
+//          pop eax             ; Pop 'a' to eax.
+//          pop ebx             ; Pop 'b' to ebx.
+//          and eax, ebx        ; Compute the result to eax.
+//          jmp ebp             ; Return to the return address.
+//
+@_bitAnd = $5D83F80275FE585B21D8FFE5;
+
+// _bitXor(a, b): Compute the bitwise XOR of 'a' and 'b'.
+//
+// Implementation in NASM syntax:
+//          pop ebp             ; Pop the return address to ebp.
+//          cmp eax, 2
+//  fail:   jne fail            ; If the number of arguments is not 2, loop forever.
+//          pop eax             ; Pop 'a' to eax.
+//          pop ebx             ; Pop 'b' to ebx.
+//          xor eax, ebx        ; Compute the result to eax.
+//          jmp ebp             ; Return to the return address.
+//
+@_bitXor = $5D83F80275FE585B31D8FFE5;
+
+// _bitNot(val): Compute the bitwise NOT of given value.
+//
+// Implementation in NASM syntax:
+//          pop ebp             ; Pop the return address to ebp.
+//          cmp eax, 1
+//  fail:   jne fail            ; If the number of arguments is not 1, loop forever.
+//          pop eax             ; Pop 'a' to eax.
+//          not eax             ; Compute the result to eax.
+//          jmp ebp             ; Return to the return address.
+//
+@_bitNot = $5D83F80175FE58F7D0FFE5;
+
+// _shiftLeftMasked(a, b): Compute 'a' shifted to the left by 'b % 32'.
+//
+// Implementation in NASM syntax:
+//          pop ebp             ; Pop the return address to ebp.
+//          cmp eax, 2
+//  fail:   jne fail            ; If the number of arguments is not 2, loop forever.
+//          pop eax             ; Pop 'a' to eax.
+//          pop ecx             ; Pop 'b' to ecx.
+//          shl eax, cl         ; Compute the result to eax.
+//          jmp ebp             ; Return to the return address.
+//
+@_shiftLeftMasked = $5D83F80275FE5859D3E0FFE5;
+
+// _shiftRightMasked(a, b): Compute 'a' shifted to the right by 'b % 32'.
+//
+// Implementation in NASM syntax:
+//          pop ebp             ; Pop the return address to ebp.
+//          cmp eax, 2
+//  fail:   jne fail            ; If the number of arguments is not 2, loop forever.
+//          pop eax             ; Pop 'a' to eax.
+//          pop ecx             ; Pop 'b' to ecx.
+//          shr eax, cl         ; Compute the result to eax.
+//          jmp ebp             ; Return to the return address.
+//
+@_shiftRightMasked = $5D83F80275FE5859D3E8FFE5;
+
 //--- Memory access ---///
 
 @get8 = [addr]{
@@ -167,6 +231,19 @@
         func(i);
         1
     })
+};
+
+//--- Bitwise operations ---//
+
+@bitAnd = [a, b]{ _bitAnd(a, b) };
+@bitOr = [a, b]{ _bitNot(_bitAnd(_bitNot(a), _bitNot(b))) };
+@bitNot = [val]{ _bitNot(val) };
+
+@shiftLeft = [a, b]{
+    ifElse(b < 32, { _shiftLeftMasked(a, b) }, 0)
+};
+@shiftRight = [a, b]{
+    ifElse(b < 32, { _shiftRightMasked(a, b) }, 0)
 };
 
 //--- Error handling (minimal implementations; some are replaced later) ---//

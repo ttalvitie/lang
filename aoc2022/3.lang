@@ -35,7 +35,6 @@ runWhileTrue({
         });
 
         // Read in groups of three.
-        @asd = 1;
         forRange(0, 3, [memberIdx]{
             if(lineLen % 2, {
                 fail("Line length is not even")
@@ -62,13 +61,8 @@ runWhileTrue({
             // Star 2:
             forRange(0, lineLen, [i]{
                 @bits = elfBits(get8(line + i));
-                // TODO: make less hacky using bitwise operators
-                if(*bits % (2 * asd) < asd, {
-                    *bits = *bits + asd
-                })
+                *bits = bitOr(*bits, shiftLeft(1, memberIdx))
             });
-
-            asd = asd * 2;
 
             line = inputLine();
             lineLen = strLen(line)
