@@ -52,10 +52,31 @@
 //          jmp ebp             ; Return to the return address (the number of bytes read is already in eax).
 //  fail2:  mov eax, -1         ; Set the return value to (0 - 1) to mark the error.
 //          jmp ebp             ; Return to the return address.
+//
 @_readSomeStdin = $5D83F80275FEB803000000BB00000000595ACD8083F8007C02FFE5B8FFFFFFFFFFE5;
+
+// _runWhileTrue(func): Call func repeatedly until it returns false (0).
+//
+// Implementation in NASM syntax:
+//          cmp eax, 1
+//  fail:   jne fail            ; If the number of arguments is not 1, loop forever.
+//  loop:   mov eax, 0          ; Set eax (the number of arguments for the call) to 0.
+//          call [esp+4]        ; Call 'func'.
+//          cmp eax, 0
+//          jne loop            ; If the return value is nonzero, retry calling the function.
+//          pop ebp             ; Pop the return address to ebp.
+//          add esp, 4          ; Discard the 'func' argument from the stack.
+//          jmp ebp             ; Return to the return address (the return value eax is already 0).
+//
+@_runWhileTrue = $83F80175FEB800000000FF54240483F80075F25D83C404FFE5;
 
 //------------------------------------------------------------------------------------------------//
 // PROGRAM                                                                                        //
 //------------------------------------------------------------------------------------------------//
 
-_readSomeStdin(brk, 30)
+@i = 5;
+_runWhileTrue({
+    _writeSomeStdout("ASD
+", 4);
+    i = i - 1
+})
