@@ -180,6 +180,7 @@ int extendName(u8 newCh, Name** name, Name* newNode, Name*** link) {
 }
 
 // Forward declarations needed for cyclic recursion.
+void compileExpression();
 void compileStatementSequence(u8* varBaseSlot, u32 varOffset);
 
 // True for characters that can end literals or variable names (e.g. statement and argument list
@@ -197,6 +198,7 @@ int isStopCharacter(u8 character) {
         character == '(' ||
         character == ')' ||
         character == '}' ||
+        character == ',' ||
         character == 0;
 }
 
@@ -215,7 +217,7 @@ void ensureNotLValue(int* pIsLValue) {
 // Compile a body of function literal (assumes that all argCount arguments have already been added
 // to the name trie). Emits a jump that bypasses the function implementation and writes the
 // function pointer to eax.
-void compileFuncLiteral(u32 argCount) {
+void compileFuncLiteral(u8* baseSlot, u32 argCount) {
     // mov ebx, 'endPtr': Write the address to the code after the function implementation to ebx
     // (to be filled in after emitting the string).
     emitU8(0xBB);
@@ -225,10 +227,6 @@ void compileFuncLiteral(u32 argCount) {
     // jmp ebx: Jump to the code after the function implementation.
     emitU8(0xFF);
     emitU8(0xE3);
-
-    // Create a base pointer slot for the function.
-    u8* baseSlot = memPos;
-    emitPtr(NULL);
 
     u8* entryPoint = memPos;
 
@@ -288,6 +286,12 @@ void compileFuncLiteral(u32 argCount) {
     emitPtr(entryPoint);
 }
 
+// Read argument list of a function literal, defining the argument variables to the trie, compiling
+// the function body using compileFuncLiteral and then undefining the argument variables.
+void compileFuncLiteralWithArgumentList(u8* baseSlot, Name* name, u32 argCount) {
+    fail("TODO");
+}
+
 // Compile atomic expression (that is, expressions that remain after splitting the code at binary
 // operators). Reads up to the first character that is not a part of the atomic expression.
 // If the expression is an lvalue (can occur on the left side of an assignment operator), returns 1
@@ -329,12 +333,19 @@ int compileAtomicExpression() {
         emitU32(val);
     } else if(ch == '[' || ch == '{') {
         // Function literal.
+
+        // "jmp x ; dd 'NULL' ; x:": Create a base pointer slot for the function and jump over it.
+        emitU8(0xEB);
+        emitU8(0x04);
+        u8* baseSlot = memPos;
+        emitPtr(NULL);
+
         if(ch == '[') {
             // Argument list.
-            fail("TODO: implement");
+            compileFuncLiteralWithArgumentList(baseSlot, &rootName, 0);
         } else {
             // No argument list.
-            compileFuncLiteral(0);
+            compileFuncLiteral(baseSlot, 0);
         }
     } else {
         // Variable or address of variable.
@@ -374,21 +385,54 @@ int compileAtomicExpression() {
 
     // Allow calling the expression value as a function pointer (possibly multiple times).
     while(ch == '(') {
+        ensureNotLValue(&isLValue);
+
+        // sub esp, 'argListSize': Make space for the argument list in the stack. ('argListSize' will be filled in later.)
+        emitU8(0x81);
+        emitU8(0xEC);
+        u8* argListSizeSlot = memPos;
+        emitU32(0);
+
+        // push eax: Save the function pointer to stack.
+        emitU8(0x50);
+
+        u32 argCount = 0;
+
+        // Read the argument list.
         readCh();
         if(ch != ')') {
-            fail("TODO: implement call argument lists");
+            while(1) {
+                compileExpression();
+                if(ch != ',' && ch != ')') {
+                    fail("Expected ',' or ')'");
+                }
+
+                ++argCount;
+
+                // mov [esp+'4 * argCount'], eax: Write the expression value to the its position in the argument list.
+                emitU8(0x89);
+                emitU8(0x84);
+                emitU8(0x24);
+                emitU32(4 * argCount);
+
+                if(ch == ')') {
+                    break;
+                }
+                readCh();
+            }
         }
         readCh();
 
-        ensureNotLValue(&isLValue);
+        // Fill in the argument list size we reserved earlier.
+        u32 argListSize = 4 * argCount;
+        writeU32(argListSizeSlot, argListSize);
 
-        // mov ebx, eax: Copy the function pointer in eax to ebx.
-        emitU8(0x89);
-        emitU8(0xC3);
-
-        // mov eax, 0: Set the number of arguments for the call to 0.
+        // mov eax, 'argCount': Set the number of arguments for the call to 'argCount'.
         emitU8(0xB8);
-        emitU32(0);
+        emitU32(argCount);
+
+        // pop ebx: Pop the function pointer from the stack to eax.
+        emitU8(0x5B);
 
         // call ebx: Call the function pointer in ebx.
         emitU8(0xFF);
