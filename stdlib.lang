@@ -297,8 +297,7 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     printDec(givenArgCount);
     printStrL(").");
 
-    // Go to infinite loop.
-    runWhileTrue({ 1 })
+    exit(1)
 };
 
 //--- String conversions ---//

@@ -1,0 +1,94 @@
+@foundBuf = brk;
+brk = brk + 4 * 256;
+@found = [i]{
+    foundBuf + 4 * i
+};
+
+@elfBitsBuf = brk;
+brk = brk + 4 * 256;
+@elfBits = [i]{
+    elfBitsBuf + 4 * i
+};
+
+@sum1 = 0;
+@sum2 = 0;
+
+@computePrio = [item]{
+    ifElse(chr("a") <= item <= chr("z"), {
+        item - chr("a") + 1
+    }, {
+        if(!(chr("A") <= item <= chr("Z")), {
+            fail("Invalid item")
+        });
+        item - chr("A") + 27
+    })
+};
+
+@line = inputLine();
+@lineLen = strLen(line);
+
+runWhileTrue({
+    ifElse(lineLen, {
+        // Star 2:
+        forRange(0, 256, [i]{
+            *elfBits(i) = 0
+        });
+
+        // Read in groups of three.
+        @asd = 1;
+        forRange(0, 3, [memberIdx]{
+            if(lineLen % 2, {
+                fail("Line length is not even")
+            });
+
+            // Star 1:
+            forRange(0, 256, [i]{
+                *found(i) = 0
+            });
+
+            forRange(0, lineLen / 2, [i]{
+                *found(get8(line + i)) = 1
+            });
+
+            @prio = 0;
+            forRange(lineLen / 2, lineLen, [i]{
+                @item = get8(line + i);
+                if(*found(item), {
+                    prio = computePrio(item)
+                })
+            });
+            sum1 = sum1 + prio;
+
+            // Star 2:
+            forRange(0, lineLen, [i]{
+                @bits = elfBits(get8(line + i));
+                // TODO: make less hacky using bitwise operators
+                if(*bits % (2 * asd) < asd, {
+                    *bits = *bits + asd
+                })
+            });
+
+            asd = asd * 2;
+
+            line = inputLine();
+            lineLen = strLen(line)
+        });
+
+        // Star 2:
+        forRange(0, 256, [i]{
+            if(*elfBits(i) == 7, {
+                sum2 = sum2 + computePrio(i)
+            })
+        });
+
+        1
+    }, {
+        // Empty line -> end of input.
+        0
+    })
+});
+
+printDecL(sum1);
+printDecL(sum2);
+
+0
