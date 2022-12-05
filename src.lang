@@ -39,6 +39,4 @@
 
 _writeSomeStdout("Hello, world!
 ", 14);
-
-@x = 155 / 8;
-x
+123

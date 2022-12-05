@@ -1114,6 +1114,10 @@ void compileStatementSequence(u8* varBaseSlot, u32 varOffset) {
             // return here.
             return;
         } else {
+            if(ch == '}' || ch == 0) {
+                fail("Returning the value of the variable with empty name; this is most likely a bug and thus disallowed.");
+            }
+
             compileExpression();
 
             if(ch != ';') {
