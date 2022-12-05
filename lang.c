@@ -48,10 +48,18 @@ FILE* src;
 // Character read from src using readRawCh or readCh. readRawCh reads the source character to ch
 // or 0 if all characters have been read (0 is not allowed in the source; reading more characters
 // after the end is an error). readCh calls readRawCh and repeats the calls until the read character
-// is not a space or newline or part of a comment.
+// is not a space or newline or part of a comment. If putBackCh is nonzero, readRawCh reads it and
+// resets it to zero.
 u8 ch = '?';
+u8 putBackCh = 0;
 
 void readRawCh() {
+    if(putBackCh != 0) {
+        ch = putBackCh;
+        putBackCh = 0;
+        return;
+    }
+
     if(ch == 0) {
         fail("Read past the end of the source file.");
     }
@@ -85,6 +93,21 @@ void readCh() {
             }
         }
     } while(ch == ' ' || ch == '\n');
+}
+
+// Convenience function for putting back character 'prevCh' that was read prior to the current
+// character: checks that there is no already put back character and the current current character
+// is not zero, and makes 'prevCh' the currently read character and the currently read character
+// the next character to be read.
+void setPutBackCh(char prevCh) {
+    if(ch == 0) {
+        fail("Expected character.");
+    }
+    if(putBackCh != 0) {
+        fail("Internal compiler error: could not put back read character.");
+    }
+    putBackCh = ch;
+    ch = prevCh;
 }
 
 const size_t memSize = (size_t)1 << 22;
@@ -619,8 +642,87 @@ int compileExpressionImpl4() {
 }
 int compileExpressionImpl3() {
     // Comparison operator handling.
-    // TODO.
-    return compileExpressionImpl4();
+
+    int isLValue = compileExpressionImpl4();
+    if(ch == '=') {
+        // We have a comparison expression; parse it as a comparison chain with short-circuiting.
+
+        // push ['falseJumpPoint']: Push to the stack the address to jump to when comparison fails. ('falseJumpPoint' will be filled in later.)
+        emitU8(0x68);
+        u8* falseJumpPointSlot = memPos;
+        emitPtr(NULL);
+
+        while(ch == '=') {
+            readCh();
+            if(ch != '=') {
+                // Only a single '=' sign, so this is an assignment. Thus we need to put back the read
+                // character and return.
+                setPutBackCh('=');
+                break;
+            }
+
+            ensureNotLValue(&isLValue);
+
+            // push eax: Push the previous value to the stack.
+            emitU8(0x50);
+
+            // Evaluate the latest value to eax.
+            readCh();
+            isLValue = compileExpressionImpl4();
+            ensureNotLValue(&isLValue);
+
+            // pop ebx: Pop the previous value to ebx.
+            emitU8(0x5B);
+
+            // cmp ebx, eax: Compare the previous value to the latest value.
+            emitU8(0x39);
+            emitU8(0xC3);
+
+            // "je true ; jmp [esp] ; true:": If the comparison result is not true, jump to the false case jump address stored in stack.
+            emitU8(0x74);
+            emitU8(0x03);
+            emitU8(0xFF);
+            emitU8(0x24);
+            emitU8(0x24);
+
+            // At this point, the latest value is in eax, ready to be compared to the next value.
+        }
+
+        // If control gets here, the result for the whole comparison expression is true.
+
+        // mov eax, 1: Set the comparison result to 1 (true).
+        emitU8(0xB8);
+        emitU32(1);
+
+        // mov ebx, ['endJumpPoint']: Write the address to the end to ebx. ('endJumpPoint' will be filled in later.)
+        emitU8(0xBB);
+        u8* endJumpPointSlot = memPos;
+        emitPtr(NULL);
+
+        // jmp ebx: Jump to end.
+        emitU8(0xFF);
+        emitU8(0xE3);
+
+        // Start the code for the false case; fill in its address to the slot that was reserved earlier.
+        writePtr(falseJumpPointSlot, memPos);
+
+        // mov eax, 0: Set the comparison result to 0 (false).
+        emitU8(0xB8);
+        emitU32(0);
+
+        // Start the end code for the comparison; fill in its address to the slot that was reserved earlier.
+        writePtr(endJumpPointSlot, memPos);
+
+        // add esp, 4: Pop the false jump point from the stack.
+        emitU8(0x83);
+        emitU8(0xC4);
+        emitU8(0x04);
+
+        return 0;
+    } else {
+        // Not a comparison expression; return the value unmodified.
+        return isLValue;
+    }
 }
 int compileExpressionImpl2() {
     // Logical operator handling.
