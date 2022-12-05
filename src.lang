@@ -1,4 +1,4 @@
 ' Set the empty variable name to the identity function to allow parenthesization in expressions.
 @ = [x]{ x };
 
-0 || 0 || 0
+#1A

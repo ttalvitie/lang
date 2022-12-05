@@ -409,7 +409,28 @@ int compileAtomicExpression() {
 
     int isLValue = 0;
 
-    if(ch >= '0' && ch <= '9') {
+    if(ch == '#') {
+        // Hexadecimal literal.
+        u32 val = 0;
+
+        readCh();
+        while(!isStopCharacter(ch)) {
+            val *= 16;
+            if(ch >= '0' && ch <= '9') {
+                val += ch - '0';
+            } else if(ch >= 'A' && ch <= 'F') {
+                val += 10;
+                val += ch - 'A';
+            } else {
+                fail("Expected hexadecimal digit.");
+            }
+            readCh();
+        }
+
+        // mov eax, 'val': Set the expression value eax to 'val'.
+        emitU8(0xB8);
+        emitU32(val);
+    } else if(ch >= '0' && ch <= '9') {
         // Decimal literal.
         u32 val = 0;
         while(!isStopCharacter(ch)) {
