@@ -213,6 +213,8 @@ int isStopCharacter(u8 character) {
     return
         character == '=' ||
         character == '!' ||
+        character == '&' ||
+        character == '|' ||
         character == '<' ||
         character == '>' ||
         character == '+' ||
@@ -364,6 +366,23 @@ void compileFuncLiteralWithArgumentList(Name* name, u8* baseSlot, u32 argCount) 
             }
         }
     }
+}
+
+// Emit code that logically negates the value in eax.
+void emitEaxLogicalNegation() {
+    // cmp eax, 0: Compare the result in eax to zero.
+    emitU8(0x83);
+    emitU8(0xF8);
+    emitU8(0x00);
+
+    // mov eax, 0: Initialize the result in eax to zero.
+    emitU8(0xB8);
+    emitU32(0);
+
+    // sete al: Set the lowest byte of eax to 1 if eax was nonzero in the comparison above.
+    emitU8(0x0F);
+    emitU8(0x94);
+    emitU8(0xC0);
 }
 
 // Compile atomic expression (that is, expressions that remain after splitting the code at binary
@@ -535,20 +554,7 @@ int compileAtomicExpression() {
         ensureNotLValue(&isLValue);
     }
     while(logNegCount) {
-        // cmp eax, 0: Compare the result in eax to zero.
-        emitU8(0x83);
-        emitU8(0xF8);
-        emitU8(0x00);
-
-        // mov eax, 0: Initialize the result in eax to zero.
-        emitU8(0xB8);
-        emitU32(0);
-
-        // sete al: Set the lowest byte of eax to 1 if eax was nonzero in the comparison above.
-        emitU8(0x0F);
-        emitU8(0x94);
-        emitU8(0xC0);
-
+        emitEaxLogicalNegation();
         --logNegCount;
     }
 
@@ -752,8 +758,98 @@ int compileExpressionImpl3() {
 }
 int compileExpressionImpl2() {
     // Logical operator handling.
-    // TODO.
-    return compileExpressionImpl3();
+
+    int isLValue = compileExpressionImpl3();
+    if(ch == '&' || ch == '|') {
+        // We have a logical and/or expression; parse it as an and/or chain with short-circuiting.
+
+        // Only allow cmpCh operators (i.e. no mixing && and ||) for simplicity.
+        u8 cmpCh = ch;
+
+        // Parse this as a '&&' expression, doing negations as required for the '||' case.
+
+        // push ['falseJumpPoint']: Push to the stack the address to jump to when false is encountered. ('falseJumpPoint' will be filled in later.)
+        emitU8(0x68);
+        u8* falseJumpPointSlot = memPos;
+        emitPtr(NULL);
+
+        while(1) {
+            ensureNotLValue(&isLValue);
+
+            // Logically negate the value if we are compiling a '||' expression.
+            if(cmpCh == '|') {
+                emitEaxLogicalNegation();
+            }
+
+            // cmp eax, 0: Compare the value to 0.
+            emitU8(0x83);
+            emitU8(0xF8);
+            emitU8(0x00);
+
+            // "jne true ; jmp [esp] ; true:": If the value is zero, jump to the false case jump address stored in stack.
+            emitU8(0x75);
+            emitU8(0x03);
+            emitU8(0xFF);
+            emitU8(0x24);
+            emitU8(0x24);
+
+            if(ch != '&' && ch != '|') {
+                // End of the chain.
+                break;
+            }
+            if(ch != cmpCh) {
+                fail("Expected '%c'", (char)cmpCh);
+            }
+            readCh();
+            if(ch != cmpCh) {
+                fail("Expected '%c'", (char)cmpCh);
+            }
+
+            // Evaluate the latest value to eax.
+            readCh();
+            isLValue = compileExpressionImpl3();
+        }
+
+        // If control gets here, the result for the whole expression is true.
+
+        // mov eax, 1: Set the result to 1 (true).
+        emitU8(0xB8);
+        emitU32(1);
+
+        // mov ebx, ['endJumpPoint']: Write the address to the end to ebx. ('endJumpPoint' will be filled in later.)
+        emitU8(0xBB);
+        u8* endJumpPointSlot = memPos;
+        emitPtr(NULL);
+
+        // jmp ebx: Jump to end.
+        emitU8(0xFF);
+        emitU8(0xE3);
+
+        // Start the code for the false case; fill in its address to the slot that was reserved earlier.
+        writePtr(falseJumpPointSlot, memPos);
+
+        // mov eax, 0: Set the result to 0 (false).
+        emitU8(0xB8);
+        emitU32(0);
+
+        // Start the end code for the expression; fill in its address to the slot that was reserved earlier.
+        writePtr(endJumpPointSlot, memPos);
+
+        // add esp, 4: Pop the false jump point from the stack.
+        emitU8(0x83);
+        emitU8(0xC4);
+        emitU8(0x04);
+
+        // Logically negate the value if we are compiling a '||' expression.
+        if(cmpCh == '|') {
+            emitEaxLogicalNegation();
+        }
+
+        return 0;
+    } else {
+        // Not a logical and/or expression; return the value unmodified.
+        return isLValue;
+    }
 }
 
 void compileExpressionImpl1() {
