@@ -15,9 +15,12 @@ aoc2022/gen/$(1).full.lang: stdlib.lang aoc2022/$(1).lang
 	cat aoc2022/$(1).lang >> aoc2022/gen/tmp.$(1).full.lang
 	mv aoc2022/gen/tmp.$(1).full.lang aoc2022/gen/$(1).full.lang
 
-.PHONY: test$(1)
+.PHONY: test$(1)ex test$(1)
 
-test$(1): lang aoc2022/gen/$(1).full.lang
+test$(1)ex: lang aoc2022/gen/$(1).full.lang aoc2022/$(1)ex.in aoc2022/$(1)ex.out
+	bash -c "set -o pipefail ; ./lang aoc2022/gen/$(1).full.lang < aoc2022/$(1)ex.in | diff - aoc2022/$(1)ex.out"
+
+test$(1): test$(1)ex lang aoc2022/gen/$(1).full.lang aoc2022/$(1).in aoc2022/$(1).out
 	bash -c "set -o pipefail ; ./lang aoc2022/gen/$(1).full.lang < aoc2022/$(1).in | diff - aoc2022/$(1).out"
 
 test: test$(1)
