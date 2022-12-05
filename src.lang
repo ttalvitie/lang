@@ -70,6 +70,41 @@
 //
 @_runWhileTrue = $83F80175FEB800000000FF54240483F80075F25D83C404FFE5;
 
+// _get8(addr): Read 8-bit value from given address and return it.
+//
+// Implementation in NASM syntax:
+//          pop ebp             ; Pop the return address to ebp.
+//          cmp eax, 1
+//  fail:   jne fail            ; If the number of arguments is not 1, loop forever.
+//          pop ebx             ; Pop the address to read to ebx.
+//          mov al, [ebx]       ; Read the byte to the bottom byte of eax (the rest of the bytes are zero already).
+//          jmp ebp             ; Return to the return address.
+//
+@_get8 = $5D83F80175FE5B8A03FFE5;
+
+// _put8(addr, val): Write the bottom byte of 'val' to 'addr'.
+//
+// Implementation in NASM syntax:
+//          pop ebp             ; Pop the return address to ebp.
+//          cmp eax, 2
+//  fail:   jne fail            ; If the number of arguments is not 2, loop forever.
+//          pop ebx             ; Pop 'addr' to ebx.
+//          pop ecx             ; Pop 'val' to ecx.
+//          mov [ebx], cl       ; Write the bottom byte of ecx to the address ebx.
+//          mov eax, 0          ; Set the return value eax to 0.
+//          jmp ebp             ; Return to the return address.
+//
+@_put8 = $5D83F80275FE5B59880BB800000000FFE5;
+
+//--- Memory access ---///
+
+@get8 = [addr]{
+    _get8(addr)
+};
+@put8 = [addr, val]{
+    _put8(addr, val)
+};
+
 //--- Control flow ---//
 
 @runWhileTrue = [func]{
@@ -155,8 +190,7 @@
 
 @printStr = [str]{
     @len = 0;
-    // TODO: implement proper 8-bit read
-    while({ *(str + len) % 256 }, { len = len + 1 });
+    while({ get8(str + len) }, { len = len + 1 });
     writeStdout(str, len)
 };
 
@@ -170,8 +204,7 @@
                 0
             }, {
                 // Append character to string and continue.
-                // TODO: implement proper 8-bit write.
-                *brk = ch;
+                put8(brk, ch);
                 brk = brk + 1;
                 1
             })
@@ -182,8 +215,7 @@
     });
 
     // Append the null terminator.
-    // TODO: implement proper 8-bit write.
-    *brk = 0;
+    put8(brk, 0);
     brk = brk + 1;
 
     ret
@@ -224,8 +256,7 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     @val = 0;
     @empty = 1;
     runWhileTrue({
-        // TODO: implement proper 8-bit read
-        @ch = *str % 256;
+        @ch = get8(str);
         ifElse(ch, {
             empty = 0;
             if(!(#30 <= ch <= #39), {
