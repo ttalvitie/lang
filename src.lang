@@ -10,14 +10,32 @@
 ' Store the start of the currently unreserved heap memory in the 'brk' variable.
 @brk = __builtin_initialProgramBreak;
 
+'--- Foundation functions implemented in machine code. ---'
+
+' _writeSomeStdout(buf, size):
+'   Write at least one and up to 'size' bytes from 'buf' to stdout. Returns the number of bytes
+'   written or zero if writing fails. 'size' must be nonzero.
+'
+' Assembly source:
+'           pop ebp             ; Pop the return address to ebp.
+'           cmp eax, 2
+'   fail:   jne fail            ; If the number of arguments is not 2, loop forever.
+'           mov eax, 4          ; Use the "write" system call.
+'           mov ebx, 1          ; Use standard output.
+'           pop ecx             ; Use the 'buf' argument as buffer address.
+'           pop edx             ; Use the 'size' argument as the maximum number of bytes to write.
+'           int 0x80            ; Perform the system call; return value is saved to eax.
+'           cmp eax, 1
+'           jl fail2            ; If an error occured (nonpositive return value), jump to fail2.
+'           jmp ebp             ; Return to the return address (the number of bytes written is already in eax).
+'   fail2:  mov eax, 0          ; Set the return value to 0 to mark the error
+'           jmp ebp             ; Return to the return address.
+'
+@_writeSomeStdout = $5D83F80275FEB804000000BB01000000595ACD8083F8017C02FFE5B800000000FFE5;
+
 '--------------------------------------------------------------------------------------------------'
 ' PROGRAM                                                                                          '
 '--------------------------------------------------------------------------------------------------'
 
-__builtin_wrongNumberOfArgumentsHandler = [x, y, z, w]{
-    @ptr = 0;
-    *ptr = 5;
-};
-
-@func = [x, y]{ 5 };
-func(6, 7, 8)
+_writeSomeStdout("Hello, world!
+", 14)
