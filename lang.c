@@ -212,6 +212,9 @@ void compileStatementSequence(u8* varBaseSlot, u32 varOffset);
 int isStopCharacter(u8 character) {
     return
         character == '=' ||
+        character == '!' ||
+        character == '<' ||
+        character == '>' ||
         character == '+' ||
         character == '*' ||
         character == '/' ||
@@ -644,7 +647,7 @@ int compileExpressionImpl3() {
     // Comparison operator handling.
 
     int isLValue = compileExpressionImpl4();
-    if(ch == '=') {
+    if(ch == '=' || ch == '!') {
         // We have a comparison expression; parse it as a comparison chain with short-circuiting.
 
         // push ['falseJumpPoint']: Push to the stack the address to jump to when comparison fails. ('falseJumpPoint' will be filled in later.)
@@ -652,13 +655,20 @@ int compileExpressionImpl3() {
         u8* falseJumpPointSlot = memPos;
         emitPtr(NULL);
 
-        while(ch == '=') {
+        while(ch == '=' || ch == '!') {
+            u8 firstCh = ch;
             readCh();
             if(ch != '=') {
                 // Only a single '=' sign, so this is an assignment. Thus we need to put back the read
                 // character and return.
                 setPutBackCh('=');
                 break;
+            }
+            u8 cmpInstruction;
+            if(firstCh == '!') {
+                cmpInstruction = 0x75; // Non-equality comparison jne.
+            } else {
+                cmpInstruction = 0x74; // Equality comparison je.
             }
 
             ensureNotLValue(&isLValue);
@@ -678,8 +688,8 @@ int compileExpressionImpl3() {
             emitU8(0x39);
             emitU8(0xC3);
 
-            // "je true ; jmp [esp] ; true:": If the comparison result is not true, jump to the false case jump address stored in stack.
-            emitU8(0x74);
+            // "JCC true ; jmp [esp] ; true:": If the comparison result is not true (using conditional jump instruction JCC), jump to the false case jump address stored in stack.
+            emitU8(cmpInstruction);
             emitU8(0x03);
             emitU8(0xFF);
             emitU8(0x24);

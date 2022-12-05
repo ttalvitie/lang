@@ -1,4 +1,4 @@
 ' Set the empty variable name to the identity function to allow parenthesization in expressions.
 @ = [x]{ x };
 
-8 == 4 + 4 == 2 + 6
+8 == 4 + 4 != 2 + 7 == 9
