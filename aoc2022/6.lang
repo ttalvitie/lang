@@ -1,13 +1,12 @@
 @solve = [line, windowLength]{
     @ret = 0 - 1;
-    forRangeWhileTrue(windowLength, strLen(line) + 1, [i]{
-        @distinct = forRangeWhileTrue(1, windowLength + 1, [j]{
-            @asd = forRangeWhileTrue(j + 1, windowLength + 1, [k]{
-                get8(line + i - j) != get8(line + i - k)
-            });
-            asd
+    forRangeWhileTrue(0, strLen(line) - windowLength + 1, [i]{
+        @distinct = forRangeWhileTrue(0, windowLength, [j]{
+            forRangeWhileTrue(j + 1, windowLength, [k]{
+                get8(line + i + j) != get8(line + i + k)
+            })
         });
-        ifElse(distinct, { ret = i; 0 }, { 1 })
+        ifElse(distinct, { ret = i + windowLength; 0 }, { 1 })
     });
     ret
 };
