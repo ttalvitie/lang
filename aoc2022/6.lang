@@ -1,0 +1,19 @@
+@solve = [line, windowLength]{
+    @ret = 0 - 1;
+    forRangeWhileTrue(windowLength, strLen(line) + 1, [i]{
+        @distinct = forRangeWhileTrue(1, windowLength + 1, [j]{
+            @asd = forRangeWhileTrue(j + 1, windowLength + 1, [k]{
+                get8(line + i - j) != get8(line + i - k)
+            });
+            asd
+        });
+        ifElse(distinct, { ret = i; 0 }, { 1 })
+    });
+    ret
+};
+
+@line = inputLine();
+printDecL(solve(line, 4));
+printDecL(solve(line, 14));
+
+0

@@ -215,15 +215,17 @@
 
 @forRangeWhileTrue = [a, b, func]{
     @i = a;
+    @lastRet = 1;
     runWhileTrue({
         ifElse(i < b, {
-            @ret = func(i);
+            lastRet = func(i);
             i = i + 1;
-            ret
+            lastRet
         }, {
             0
         })
-    })
+    });
+    lastRet
 };
 
 @forRange = [a, b, func]{
