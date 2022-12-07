@@ -259,6 +259,15 @@
     exit(1)
 };
 
+@assertMsg = [cond, msg]{
+    if(!cond, { fail(msg) });
+    0
+};
+@assert = [cond]{
+    if(!cond, { fail("Assertion failed") });
+    0
+};
+
 //--- Strings ---//
 
 @endlStr = "
@@ -268,6 +277,21 @@
     @len = 0;
     while({ get8(str + len) }, { len = len + 1 });
     len
+};
+
+@strEqual = [a, b]{
+    @eq = 1;
+    runWhileTrue({
+        @x = get8(a);
+        @y = get8(b);
+        a = a + 1;
+        b = b + 1;
+        if(x != y, {
+            eq = 0
+        });
+        eq && x
+    });
+    eq
 };
 
 //--- Input/output ---//
@@ -410,6 +434,53 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
         fail("charNum: The length of given string is not 1")
     });
     get8(str)
+};
+
+//--- Vector: a resizable array ---//
+
+// Vector internals:
+@Vector_data = [vector]{ vector + 0 };
+@Vector_itemSize = [vector]{ vector + 4 };
+@Vector_size = [vector]{ vector + 8 };
+@Vector_capacity = [vector]{ vector + 12 };
+@Vector_sizeof = 16;
+
+// Vector public interface:
+@Vector.init = [itemSize]{
+    @vector = brk;
+    brk = brk + Vector_sizeof;
+    *Vector_data(vector) = 0;
+    *Vector_itemSize(vector) = itemSize;
+    *Vector_size(vector) = 0;
+    *Vector_capacity(vector) = 0;
+    vector
+};
+
+@Vector.size = [vector]{
+    *Vector_size(vector)
+};
+
+@Vector.item = [vector, i]{
+    *Vector_data(vector) + *Vector_itemSize(vector) * i
+};
+
+@Vector.push = [vector]{
+    @itemSize = *Vector_itemSize(vector);
+    @oldSize = *Vector_size(vector);
+
+    *Vector_size(vector) = oldSize + 1;
+
+    if(*Vector_size(vector) > *Vector_capacity(vector), {
+        *Vector_capacity(vector) = 2 * *Vector_size(vector);
+        @oldData = *Vector_data(vector);
+        @newData = brk;
+        brk = brk + itemSize * *Vector_capacity(vector);
+        *Vector_data(vector) = newData;
+        forRange(0, itemSize * oldSize, [i]{
+            put8(newData + i, get8(oldData + i))
+        })
+    });
+    Vector.item(vector, oldSize)
 };
 
 //------------------------------------------------------------------------------------------------//

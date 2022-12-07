@@ -1,0 +1,142 @@
+@Dir.name = [dir]{ dir + 0 };
+@Dir.parent = [dir]{ dir + 4 };
+@Dir.subdirs = [dir]{ dir + 8 };
+@Dir.size = [dir]{ dir + 12 };
+@Dir.sizeof = 16;
+
+@Dir.init = [name, parent]{
+    @dir = brk;
+    brk = brk + Dir.sizeof;
+    *Dir.name(dir) = name;
+    *Dir.parent(dir) = parent;
+    *Dir.subdirs(dir) = Vector.init(4);
+    *Dir.size(dir) = 0;
+    dir
+};
+
+@rootDir = Dir.init("", 0);
+@currentDir = rootDir;
+
+@addFile = [name, size]{
+    *Dir.size(currentDir) = *Dir.size(currentDir) + size
+};
+
+@cd = [arg]{
+    @ch = get8(arg);
+    ifElse(ch == charNum("/"), {
+        assert(strEqual(arg, "/"));
+
+        currentDir = rootDir
+    }, {
+        ifElse(ch == charNum("."), {
+            assert(strEqual(arg, ".."));
+
+            currentDir = *Dir.parent(currentDir);
+            assert(currentDir)
+        }, {
+            @subdirs = *Dir.subdirs(currentDir);
+            @notFound = forRangeWhileTrue(0, Vector.size(subdirs), [i]{
+                @subdir = *Vector.item(subdirs, i);
+                ifElse(strEqual(*Dir.name(subdir), arg), {
+                    currentDir = subdir;
+                    0
+                }, {
+                    1
+                })
+            });
+            if(notFound, {
+                @newDir = Dir.init(arg, currentDir);
+                *Vector.push(subdirs) = newDir;
+                currentDir = newDir
+            })
+        })
+    })
+};
+
+@splitAt = [pLine, splitCh]{
+    @ret = *pLine;
+    while({ @ch = get8(*pLine); ch != splitCh && ch != 0 }, { *pLine = *pLine + 1 });
+    put8(*pLine, 0);
+    *pLine = *pLine + 1;
+    ret
+};
+
+@line = inputLine();
+
+@processCommand = {
+    assert(get8(line) == charNum("$"));
+    assert(strLen(line) >= 4);
+ 
+    ifElse(get8(line + 2) == charNum("l"), {
+        assert(get8(line + 3) == charNum("s"));
+
+        runWhileTrue({
+            line = inputLine();
+            @ch = get8(line);
+            ifElse(ch != charNum("$") && ch != 0, {
+                if(charNum("0") <= ch <= charNum("9"), {
+                    @size = parseDec(splitAt(&line, charNum(" ")));
+                    @name = line;
+                    addFile(name, size)
+                });
+                1
+            }, {
+                0
+            })
+        })
+    }, {
+        assert(get8(line + 2) == charNum("c"));
+        assert(get8(line + 3) == charNum("d"));
+
+        assert(strLen(line) >= 5);
+
+        cd(line + 5);
+
+        line = inputLine()
+    })
+};
+
+runWhileTrue({
+    ifElse(get8(line), {
+        processCommand();
+        1
+    }, {
+        // Empty line -> end of input.
+        0
+    })
+});
+
+@sum1 = 0;
+@dfs1 = [dir]{
+    @size = *Dir.size(dir);
+    @subdirs = *Dir.subdirs(dir);
+    forRange(0, Vector.size(subdirs), [i]{
+        size = size + dfs1(*Vector.item(subdirs, i))
+    });
+    if(size < 100000, {
+        sum1 = sum1 + size
+    });
+    *Dir.size(dir) = size;
+    size
+};
+dfs1(rootDir);
+printDecL(sum1);
+
+@ret2 = 0 - 1;
+@dfs2 = [dir]{
+    @subdirs = *Dir.subdirs(dir);
+    forRange(0, Vector.size(subdirs), [i]{
+        dfs2(*Vector.item(subdirs, i))
+    });
+
+    @size = *Dir.size(dir);
+    @rootSize = *Dir.size(rootDir);
+
+    if(rootSize - size <= 40000000 && size < ret2, {
+        ret2 = size
+    })
+};
+dfs2(rootDir);
+printDecL(ret2);
+
+0
