@@ -263,6 +263,38 @@
     ifElse(b < 32, { _shiftRightMasked(a, b) }, 0)
 };
 
+//--- Variadic function support ---//
+
+// Generate and return a pointer to a variadic function that forwards the call to function implFunc,
+// passing as arguments the number of arguments and a pointer to the array of arguments.
+@genVariadicFunc = [implFunc]{
+    // push eax: Push the number of arguments so that we know how many arguments to discard before returning.
+
+    // push eax: Push the number of arguments to the first argument for 'implFunc'.
+
+    // mov eax, esp: Copy the stack pointer to eax.
+
+    // add eax, 12: Increment eax by 12 so that it points to the start of the arguments array.
+
+    // push eax: Push the pointer to the start of the arguments array as the second argument for 'implFunc'.
+
+    // mov eax, 2: Set the number of arguments for 'implFunc' to 2.
+
+    // mov ebx, 'implFunc': Write 'implFunc' to ebx.
+
+    // call ebx: Call 'implFunc'.
+
+    // pop ebx: Pop the number of arguments to ebx.
+
+    // shl ebx, 2: Multiply the number of arguments in ebx by 4 to get the size of the argument list
+
+    // pop ebp: Pop the return address to ebp.
+
+    // add esp, ebx: Discard the arguments from the stack.
+
+    // jmp ebp: Return to the return address (the return value eax is as set by 'implFunc').
+};
+
 //--- Error handling (minimal implementations; some are replaced later) ---//
 
 @exit = [code]{
