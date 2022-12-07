@@ -172,15 +172,6 @@
 //
 @_shiftRightMasked = $5D83F80275FE5859D3E8FFE5;
 
-//--- Memory access ---///
-
-@get8 = [addr]{
-    _get8(addr)
-};
-@put8 = [addr, val]{
-    _put8(addr, val)
-};
-
 //--- Control flow ---//
 
 @runWhileTrue = [func]{
@@ -232,6 +223,30 @@
     forRangeWhileTrue(a, b, [i]{
         func(i);
         1
+    })
+};
+
+//--- Memory ---///
+
+@get8 = [addr]{
+    _get8(addr)
+};
+@put8 = [addr, val]{
+    _put8(addr, val)
+};
+
+@copyMem = [src, dest, size]{
+    while({ size >= 4 }, {
+        *dest = *src;
+        src = src + 4;
+        dest = dest + 4;
+        size = size - 4
+    });
+    while({ size }, {
+        put8(dest, get8(src));
+        src = src + 1;
+        dest = dest + 1;
+        size = size - 1
     })
 };
 
@@ -476,9 +491,7 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
         @newData = brk;
         brk = brk + itemSize * *Vector_capacity(vector);
         *Vector_data(vector) = newData;
-        forRange(0, itemSize * oldSize, [i]{
-            put8(newData + i, get8(oldData + i))
-        })
+        copyMem(oldData, newData, itemSize * oldSize)
     });
     Vector.item(vector, oldSize)
 };
