@@ -1,0 +1,98 @@
+@lines = Vector.init(4);
+
+@w = 0;
+runWhileTrue({
+    @line = inputLine();
+    @len = strLen(line);
+    ifElse(len, {
+        assert(w == 0 || len == w);
+        w = len;
+        *Vector.push(lines) = line;
+        1
+    }, {
+        0
+    })
+});
+
+@h = Vector.size(lines);
+
+@visible = Vector.init(4);
+forRange(0, h, [y]{
+    @row = Vector.init(4);
+    forRange(0, w, [x]{
+        *Vector.push(row) = 0
+    });
+    *Vector.push(visible) = row
+});
+
+@prev = 0;
+@perCell = [x, y]{
+    @ch = get8(*Vector.item(lines, y) + x);
+    if(ch > prev, {
+        *Vector.item(*Vector.item(visible, y), x) = 1;
+        prev = ch
+    })
+};
+
+forRange(0, h, [y]{
+    prev = 0;
+    forRange(0, w, [x]{ perCell(x, y) });
+    prev = 0;
+    forRevRange(0, w, [x]{ perCell(x, y) })
+});
+
+forRange(0, w, [x]{
+    prev = 0;
+    forRange(0, h, [y]{ perCell(x, y) });
+    prev = 0;
+    forRevRange(0, h, [y]{ perCell(x, y) })
+});
+
+@count1 = 0;
+forRange(0, h, [y]{
+    forRange(0, w, [x]{
+        if(*Vector.item(*Vector.item(visible, y), x), {
+            count1 = count1 + 1
+        })
+    })
+});
+printDecL(count1);
+
+@ret2 = 0;
+forRange(0, h, [my]{
+    forRange(0, w, [mx]{
+        @mid = get8(*Vector.item(lines, my) + mx);
+
+        @count = 0;
+        @rayCastCell = [x, y]{
+            @ch = get8(*Vector.item(lines, y) + x);
+            count = count + 1;
+            ch < mid
+        };
+
+        @score = 1;
+
+        count = 0;
+        forRangeWhileTrue(mx + 1, w, [x]{ rayCastCell(x, my) });
+        score = score * count;
+
+        count = 0;
+        forRevRangeWhileTrue(0, mx, [x]{ rayCastCell(x, my) });
+        score = score * count;
+
+        count = 0;
+        forRangeWhileTrue(my + 1, h, [y]{ rayCastCell(mx, y) });
+        score = score * count;
+
+        count = 0;
+        forRevRangeWhileTrue(0, my, [y]{ rayCastCell(mx, y) });
+        score = score * count;
+
+        if(score > ret2, {
+            ret2 = score
+        })
+    })
+});
+printDecL(ret2);
+
+0

@@ -1,4 +1,4 @@
-AOC2022_DAYS := 1 2 3 4 5 6 7
+AOC2022_DAYS := 1 2 3 4 5 6 7 8
 
 .PHONY: test
 

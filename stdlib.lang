@@ -219,8 +219,30 @@
     lastRet
 };
 
+@forRevRangeWhileTrue = [a, b, func]{
+    @i = b;
+    @lastRet = 1;
+    runWhileTrue({
+        ifElse(i > a, {
+            i = i - 1;
+            lastRet = func(i);
+            lastRet
+        }, {
+            0
+        })
+    });
+    lastRet
+};
+
 @forRange = [a, b, func]{
     forRangeWhileTrue(a, b, [i]{
+        func(i);
+        1
+    })
+};
+
+@forRevRange = [a, b, func]{
+    forRevRangeWhileTrue(a, b, [i]{
         func(i);
         1
     })
