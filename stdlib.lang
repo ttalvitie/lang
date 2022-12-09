@@ -227,6 +227,18 @@
     ret
 };
 
+//--- Minimal error handling ---//
+
+@exit = [code]{
+    _exit(code)
+};
+
+// Fail the program with given error message string. Does not return; exits program.
+// This implementation does not print anything, but it will be replaced later.
+@fail = [msg]{
+    exit(1)
+};
+
 //--- Control flow ---//
 
 @runWhileTrue = [func]{
@@ -303,6 +315,27 @@
     })
 };
 
+// ifChain(cond1, func1, cond2, func2, ..., condN, funcN, defaultFunc) calls funcI for the first
+// condI() that is nonzero or defaultFunc otherwise.
+@ifChain = toVariadic([argCount, args]{
+    if(argCount % 2 == 0, {
+        fail("Even number of arguments given to ifChain")
+    });
+    @ret = 0;
+    @callDefault = forRangeWhileTrue(0, argCount / 2, [i]{
+        ifElse((*(args + 8 * i))(), {
+            ret = (*(args + 8 * i + 4))();
+            0
+        }, {
+            1
+        })
+    });
+    if(callDefault, {
+        ret = (*(args + 4 * (argCount - 1)))()
+    });
+    ret
+});
+
 //--- Memory block operations ---///
 
 @copyMem = [src, dest, size]{
@@ -337,26 +370,6 @@
 };
 @shiftRight = [a, b]{
     ifElse(b < 32, { _shiftRightMasked(a, b) }, 0)
-};
-
-//--- Error handling (minimal implementations; some are replaced later) ---//
-
-@exit = [code]{
-    _exit(code)
-};
-
-// Fail the program with given error message string. Does not return; exits program.
-@fail = [msg]{
-    exit(1)
-};
-
-@assertMsg = [cond, msg]{
-    if(!cond, { fail(msg) });
-    0
-};
-@assert = [cond]{
-    if(!cond, { fail("Assertion failed") });
-    0
 };
 
 //--- Strings ---//
@@ -453,41 +466,54 @@
     if(argCount, {
         @fmt = *args;
         @i = 0;
+
         @argIdx = 1;
+        @takeArg = {
+            if(argIdx >= argCount, {
+                fail("Not enough arguments given to print")
+            });
+            @arg = *(args + 4 * argIdx);
+            argIdx = argIdx + 1;
+            arg
+        };
 
         @writeStart = 0;
         runWhileTrue({
             @ch = get8(fmt + i);
-            ifElse(ch, {
-                ifElse(ch == charNum("%"), {
+            ifChain(
+                { ch == 0 }, {
+                    0
+                },
+                { ch == charNum("%") }, {
                     writeStdout(fmt + writeStart, i - writeStart);
                     ch = get8(fmt + i + 1);
                     if(ch == 0, {
                         fail("Unexpected end of print format string")
                     });
-                    if(argIdx >= argCount, {
-                        fail("Not enough arguments given to print")
-                    });
-                    @arg = *(args + 4 * argIdx);
-                    argIdx = argIdx + 1;
-                    ifElse(ch == charNum("s"), {
-                        writeStdout(arg, strLen(arg))
-                    }, {
-                        if(ch != charNum("u"), {
+                    ifChain(
+                        { ch == charNum("s") }, {
+                            @arg = takeArg();
+                            writeStdout(arg, strLen(arg))
+                        },
+                        { ch == charNum("u") }, {
+                            printDec(takeArg())
+                        },
+                        { ch == charNum("%") }, {
+                            writeStdout("%", 1)
+                        },
+                        {
                             fail("Unknown print format placeholder")
-                        });
-                        printDec(arg)
-                    });
+                        }
+                    );
                     i = i + 2;
                     writeStart = i;
                     1
-                }, {
+                },
+                {
                     i = i + 1;
                     1
-                })
-            }, {
-                0
-            })
+                }
+            )
         });
         writeStdout(fmt + writeStart, i - writeStart);
         if(argIdx != argCount, {
@@ -529,7 +555,7 @@
     ret
 };
 
-//--- Error handling (replacing earlier implementations) ---//
+//--- Error handling ---//
 
 fail = [msg]{
     printStr("FAIL: ");
@@ -537,6 +563,15 @@ fail = [msg]{
     printStr(endlStr);
 
     exit(1)
+};
+
+@assertMsg = [cond, msg]{
+    if(!cond, { fail(msg) });
+    0
+};
+@assert = [cond]{
+    if(!cond, { fail("Assertion failed") });
+    0
 };
 
 // Replace the wrong number of arguments handler by one that prints the information to stdout.
