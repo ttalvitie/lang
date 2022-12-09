@@ -448,20 +448,6 @@
     writeStdout(&digit, 1)
 };
 
-@printStr = [str]{
-    writeStdout(str, strLen(str))
-};
-
-@printDecL = [val]{
-    printDec(val);
-    printStr(endlStr)
-};
-
-@printStrL = [str]{
-    printStr(str);
-    printStr(endlStr)
-};
-
 @printImpl = [argCount, args, newline]{
     if(argCount, {
         @fmt = *args;
@@ -558,9 +544,7 @@
 //--- Error handling ---//
 
 fail = [msg]{
-    printStr("FAIL: ");
-    printStr(msg);
-    printStr(endlStr);
+    printL("FAIL: %s", msg);
 
     exit(1)
 };
@@ -576,15 +560,10 @@ fail = [msg]{
 
 // Replace the wrong number of arguments handler by one that prints the information to stdout.
 __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenArgCount]{
-    printStr("FAIL: Wrong number of arguments passed to the function defined on line ");
-    printDec(line);
-    printStr(", column ");
-    printDec(column);
-    printStr(" (expected ");
-    printDec(correctArgCount);
-    printStr(" arguments, got ");
-    printDec(givenArgCount);
-    printStrL(").");
+    printL(
+        "FAIL: Wrong number of arguments passed to the function defined on line %u, column %u (expected %u arguments, got %u).",
+        line, column, correctArgCount, givenArgCount
+    );
 
     exit(1)
 };
