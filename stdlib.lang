@@ -172,6 +172,61 @@
 //
 @_shiftRightMasked = $5D83F80275FE5859D3E8FFE5;
 
+//--- Memory access ---//
+
+@get8 = [addr]{
+    _get8(addr)
+};
+@put8 = [addr, val]{
+    _put8(addr, val)
+};
+
+//--- Variadic function support ---//
+
+// Creates and returns a variadic function that calls func(argCount, args) where argCount is the
+// number of arguments it receives and args is the argument array.
+@toVariadic = [func]{
+    // Helper function that forwards the call. Assumes that 'func' is in ebx.
+    //
+    // Implementation in NASM syntax:
+    //          push eax            ; Retain the number of arguments in stack.
+    //          mov ecx, esp        ; Write the stack pointer to ecx.
+    //          add ecx, 8          ; Increase ecx by 8 so that it points to the beginning of the argument list.
+    //          push ecx            ; Push the pointer to the argument list as the 'args' argument for 'func'.
+    //          push eax            ; Push the number of arguments as the 'argCount' argument for 'func'.
+    //          mov eax, 2          ; Set the number of arguments for 'func' to 2.
+    //          call ebx            ; Call 'func'.
+    //          pop ebx             ; Pop the number of arguments from stack to ebx.
+    //          shl ebx, 2          ; Multiply the number of arguments by 4 to get the argument list size in bytes.
+    //          pop ebp             ; Pop the return address to ebp.
+    //          add esp, ebx        ; Discard the argument list from the stack.
+    //          jmp ebp             ; Return to the return address (eax still contains the 'func' return value).
+    //
+    @helper = $5089E183C1085150B802000000FFD35BC1E3025D01DCFFE5;
+
+    @ret = brk;
+
+    // mov ebx, 'func': Write 'func' to ebx.
+    put8(brk, #BB);
+    brk = brk + 1;
+    *brk = func;
+    brk = brk + 4;
+
+    // mov ecx, 'helper': Write 'helper' to ecx.
+    put8(brk, #B9);
+    brk = brk + 1;
+    *brk = helper;
+    brk = brk + 4;
+
+    // jmp ecx: Jump to 'helper'.
+    put8(brk, #FF);
+    brk = brk + 1;
+    put8(brk, #E1);
+    brk = brk + 1;
+
+    ret
+};
+
 //--- Control flow ---//
 
 @runWhileTrue = [func]{
@@ -248,14 +303,7 @@
     })
 };
 
-//--- Memory ---///
-
-@get8 = [addr]{
-    _get8(addr)
-};
-@put8 = [addr, val]{
-    _put8(addr, val)
-};
+//--- Memory block operations ---///
 
 @copyMem = [src, dest, size]{
     while({ size >= 4 }, {
@@ -272,6 +320,12 @@
     })
 };
 
+@swapMem = [a, b, size]{
+    copyMem(a, brk, size);
+    copyMem(b, a, size);
+    copyMem(brk, b, size)
+};
+
 //--- Bitwise operations ---//
 
 @bitAnd = [a, b]{ _bitAnd(a, b) };
@@ -283,52 +337,6 @@
 };
 @shiftRight = [a, b]{
     ifElse(b < 32, { _shiftRightMasked(a, b) }, 0)
-};
-
-//--- Variadic function support ---//
-
-// Creates and returns a variadic function that calls func(argCount, args) where argCount is the
-// number of arguments it receives and args is the argument array.
-@toVariadic = [func]{
-    // Helper function that forwards the call. Assumes that 'func' is in ebx.
-    //
-    // Implementation in NASM syntax:
-    //          push eax            ; Retain the number of arguments in stack.
-    //          mov ecx, esp        ; Write the stack pointer to ecx.
-    //          add ecx, 8          ; Increase ecx by 8 so that it points to the beginning of the argument list.
-    //          push ecx            ; Push the pointer to the argument list as the 'args' argument for 'func'.
-    //          push eax            ; Push the number of arguments as the 'argCount' argument for 'func'.
-    //          mov eax, 2          ; Set the number of arguments for 'func' to 2.
-    //          call ebx            ; Call 'func'.
-    //          pop ebx             ; Pop the number of arguments from stack to ebx.
-    //          shl ebx, 2          ; Multiply the number of arguments by 4 to get the argument list size in bytes.
-    //          pop ebp             ; Pop the return address to ebp.
-    //          add esp, ebx        ; Discard the argument list from the stack.
-    //          jmp ebp             ; Return to the return address (eax still contains the 'func' return value).
-    //
-    @helper = $5089E183C1085150B802000000FFD35BC1E3025D01DCFFE5;
-
-    @ret = brk;
-
-    // mov ebx, 'func': Write 'func' to ebx.
-    put8(brk, #BB);
-    brk = brk + 1;
-    *brk = func;
-    brk = brk + 4;
-
-    // mov ecx, 'helper': Write 'helper' to ecx.
-    put8(brk, #B9);
-    brk = brk + 1;
-    *brk = helper;
-    brk = brk + 4;
-
-    // jmp ecx: Jump to 'helper'.
-    put8(brk, #FF);
-    brk = brk + 1;
-    put8(brk, #E1);
-    brk = brk + 1;
-
-    ret
 };
 
 //--- Error handling (minimal implementations; some are replaced later) ---//
@@ -570,14 +578,6 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
         fail("parseDec: The string is empty.")
     });
     val
-};
-
-//--- Helper functions for algorithms ---//
-
-@swapMem = [a, b, size]{
-    copyMem(a, brk, size);
-    copyMem(b, a, size);
-    copyMem(brk, b, size)
 };
 
 //--- Algorithms ---//
