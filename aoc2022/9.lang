@@ -1,0 +1,113 @@
+@path1 = Vector.init(8);
+@path2 = Vector.init(8);
+
+@posX = [pos]{ pos + 0 };
+@posY = [pos]{ pos + 4 };
+
+@length1 = 2;
+@length2 = 10;
+
+@tail = Vector.init(8);
+forRange(0, length2, [i]{
+    @item = Vector.push(tail);
+    *posX(item) = 0;
+    *posY(item) = 0
+});
+@head = Vector.item(tail, 0);
+
+@addPosToPath = [path, length]{
+    @item = Vector.push(path);
+    *posX(item) = *posX(Vector.item(tail, length - 1));
+    *posY(item) = *posY(Vector.item(tail, length - 1))
+};
+@addPos = {
+    addPosToPath(path1, length1);
+    addPosToPath(path2, length2)
+};
+
+@updCoord = [pCoord, target]{
+    @diff = target - *pCoord;
+    ifElse(diff < (0 - 1) / 2, {
+        *pCoord = *pCoord + 1
+    }, {
+        *pCoord = *pCoord - 1
+    })
+};
+@updCoord2 = [pCoord, target]{
+    @diff = target - *pCoord;
+    if(diff == 2, {
+        *pCoord = *pCoord + 1
+    });
+    if(diff == 0 - 2, {
+        *pCoord = *pCoord - 1
+    })
+};
+@abs = [val]{
+    ifElse(val < (0 - 1) / 2, { val }, { 0 - val })
+};
+@upd = [pTX, pTY, x, y]{
+    @absDx = abs(x - *pTX);
+    @absDy = abs(y - *pTY);
+    ifElse(absDx != 0 != absDy && (absDx > 1 || absDy > 1), {
+        updCoord(pTX, x);
+        updCoord(pTY, y)
+    }, {
+        updCoord2(pTX, x);
+        updCoord2(pTY, y)
+    })
+};
+
+addPos();
+
+runWhileTrue({
+    @line = inputLine();
+    @len = strLen(line);
+    ifElse(len, {
+        assert(len >= 3);
+        assert(get8(line + 1) == charNum(" "));
+        @dir = get8(line);
+        @count = parseDec(line + 2);
+        forRange(0, count, [step]{
+            ifElse(dir == charNum("L"), {
+                *posX(head) = *posX(head) - 1
+            }, {ifElse(dir == charNum("R"), {
+                *posX(head) = *posX(head) + 1
+            }, {ifElse(dir == charNum("U"), {
+                *posY(head) = *posY(head) - 1
+            }, {ifElse(dir == charNum("D"), {
+                *posY(head) = *posY(head) + 1
+            }, {
+                assert(0)
+            })})})});
+            forRange(0, length2 - 1, [i]{
+                @a = Vector.item(tail, i);
+                @b = Vector.item(tail, i + 1);
+                upd(posX(b), posY(b), *posX(a), *posY(a))
+            });
+            addPos()
+        });
+        1
+    }, {
+        0
+    })
+});
+
+@count = [path]{
+    @ret = 0;
+    forRange(0, Vector.size(path), [i]{
+        @x = *posX(Vector.item(path, i));
+        @y = *posY(Vector.item(path, i));
+        @unique = forRangeWhileTrue(0, i, [j]{
+            *posX(Vector.item(path, j)) != x || *posY(Vector.item(path, j)) != y
+        });
+        if(unique, {
+            ret = ret + 1
+        })
+    });
+    ret
+};
+
+printDecL(count(path1));
+printDecL(count(path2));
+
+0
