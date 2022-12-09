@@ -93,17 +93,26 @@ runWhileTrue({
 });
 
 @count = [path]{
+    @posCmp = [a, b]{
+        ifElse(*posY(a) == *posY(b), {
+            *posX(a) < *posX(b)
+        }, {
+            *posY(a) < *posY(b)
+        })
+    };
+    Vector.sort(path, posCmp);
+
     @ret = 0;
     forRange(0, Vector.size(path), [i]{
-        @x = *posX(Vector.item(path, i));
-        @y = *posY(Vector.item(path, i));
-        @unique = forRangeWhileTrue(0, i, [j]{
-            *posX(Vector.item(path, j)) != x || *posY(Vector.item(path, j)) != y
-        });
-        if(unique, {
-            ret = ret + 1
+        ret = ret + ifElse(i > 0, {
+            @a = Vector.item(path, i - 1);
+            @b = Vector.item(path, i);
+            *posX(a) != *posX(b) || *posY(a) != *posY(b)
+        }, {
+            1
         })
     });
+
     ret
 };
 

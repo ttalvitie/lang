@@ -473,6 +473,73 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     get8(str)
 };
 
+//--- Helper functions for algorithms ---//
+
+@swapMem = [a, b, size]{
+    copyMem(a, brk, size);
+    copyMem(b, a, size);
+    copyMem(brk, b, size)
+};
+
+//--- Algorithms ---//
+
+@makeHeap = [data, size, itemSize, cmp]{
+    forRevRange(0, size, [i]{
+        runWhileTrue({
+            @a = 2 * i + 1;
+            ifElse(a < size, {
+                @j = a;
+                @b = 2 * i + 2;
+                if(b < size && cmp(data + itemSize * a, data + itemSize * b), {
+                    j = b
+                });
+                ifElse(cmp(data + itemSize * i, data + itemSize * j), {
+                    swapMem(data + itemSize * i, data + itemSize * j, itemSize);
+                    i = j;
+                    1
+                }, {
+                    0
+                })
+            }, {
+                0
+            })
+        })
+    })
+};
+@popHeap = [data, size, itemSize, cmp]{
+    size = size - 1;
+    swapMem(data + itemSize * 0, data + itemSize * size, itemSize);
+
+    @i = 0;
+    runWhileTrue({
+        @a = 2 * i + 1;
+        ifElse(a < size, {
+            @b = 2 * i + 2;
+            @j = a;
+            if(b < size && cmp(data + itemSize * a, data + itemSize * b), {
+                j = b
+            });
+            ifElse(cmp(data + itemSize * i, data + itemSize * j), {
+                swapMem(data + itemSize * i, data + itemSize * j, itemSize);
+                i = j;
+                1
+            }, {
+                0
+            })
+        }, {
+            0
+        })
+    });
+    1
+};
+
+@sort = [data, size, itemSize, cmp]{
+    makeHeap(data, size, itemSize, cmp);
+    forRevRange(1, size + 1, [left]{
+        popHeap(data, left, itemSize, cmp)
+    })
+};
+
 //--- Vector: a resizable array ---//
 
 // Vector internals:
@@ -497,6 +564,10 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     *Vector_size(vector)
 };
 
+@Vector.data = [vector]{
+    *Vector_data(vector)
+};
+
 @Vector.item = [vector, i]{
     *Vector_data(vector) + *Vector_itemSize(vector) * i
 };
@@ -516,6 +587,10 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
         copyMem(oldData, newData, itemSize * oldSize)
     });
     Vector.item(vector, oldSize)
+};
+
+@Vector.sort = [vector, cmp]{
+    sort(Vector.data(vector), Vector.size(vector), *Vector_itemSize(vector), cmp)
 };
 
 //------------------------------------------------------------------------------------------------//
