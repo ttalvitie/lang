@@ -28,7 +28,7 @@ runWhileTrue({
     })
 });
 
-printDecL(score1);
-printDecL(score2);
+printL("%u", score1);
+printL("%u", score2);
 
 0

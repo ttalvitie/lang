@@ -116,7 +116,7 @@ runWhileTrue({
     ret
 };
 
-printDecL(count(path1));
-printDecL(count(path2));
+printL("%u", count(path1));
+printL("%u", count(path2));
 
 0

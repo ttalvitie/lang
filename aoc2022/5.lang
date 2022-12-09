@@ -126,9 +126,9 @@ runWhileTrue({
     forRange(1, n + 1, [i]{
         if(!*stacks(i), { fail("Stack is empty") });
         @ch = *Node_ch(*stacks(i));
-        printStr(&ch)
+        print("%s", &ch)
     });
-    printStrL("")
+    printL()
 };
 
 printMsg(stacks1);

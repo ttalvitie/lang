@@ -56,7 +56,7 @@ forRange(0, h, [y]{
         })
     })
 });
-printDecL(count1);
+printL("%u", count1);
 
 @ret2 = 0;
 forRange(0, h, [my]{
@@ -93,6 +93,6 @@ forRange(0, h, [my]{
         })
     })
 });
-printDecL(ret2);
+printL("%u", ret2);
 
 0

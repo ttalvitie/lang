@@ -30,7 +30,7 @@ runWhileTrue({
     ifElse(get8(line), { processLine(line); 1 }, { 0 })
 });
 
-printDecL(fullyContainedCount);
-printDecL(overlapCount);
+printL("%u", fullyContainedCount);
+printL("%u", overlapCount);
 
 0

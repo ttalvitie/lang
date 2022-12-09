@@ -285,6 +285,52 @@
     ifElse(b < 32, { _shiftRightMasked(a, b) }, 0)
 };
 
+//--- Variadic function support ---//
+
+// Creates and returns a variadic function that calls func(argCount, args) where argCount is the
+// number of arguments it receives and args is the argument array.
+@toVariadic = [func]{
+    // Helper function that forwards the call. Assumes that 'func' is in ebx.
+    //
+    // Implementation in NASM syntax:
+    //          push eax            ; Retain the number of arguments in stack.
+    //          mov ecx, esp        ; Write the stack pointer to ecx.
+    //          add ecx, 8          ; Increase ecx by 8 so that it points to the beginning of the argument list.
+    //          push ecx            ; Push the pointer to the argument list as the 'args' argument for 'func'.
+    //          push eax            ; Push the number of arguments as the 'argCount' argument for 'func'.
+    //          mov eax, 2          ; Set the number of arguments for 'func' to 2.
+    //          call ebx            ; Call 'func'.
+    //          pop ebx             ; Pop the number of arguments from stack to ebx.
+    //          shl ebx, 2          ; Multiply the number of arguments by 4 to get the argument list size in bytes.
+    //          pop ebp             ; Pop the return address to ebp.
+    //          add esp, ebx        ; Discard the argument list from the stack.
+    //          jmp ebp             ; Return to the return address (eax still contains the 'func' return value).
+    //
+    @helper = $5089E183C1085150B802000000FFD35BC1E3025D01DCFFE5;
+
+    @ret = brk;
+
+    // mov ebx, 'func': Write 'func' to ebx.
+    put8(brk, #BB);
+    brk = brk + 1;
+    *brk = func;
+    brk = brk + 4;
+
+    // mov ecx, 'helper': Write 'helper' to ecx.
+    put8(brk, #B9);
+    brk = brk + 1;
+    *brk = helper;
+    brk = brk + 4;
+
+    // jmp ecx: Jump to 'helper'.
+    put8(brk, #FF);
+    brk = brk + 1;
+    put8(brk, #E1);
+    brk = brk + 1;
+
+    ret
+};
+
 //--- Error handling (minimal implementations; some are replaced later) ---//
 
 @exit = [code]{
@@ -329,6 +375,13 @@
         eq && x
     });
     eq
+};
+
+@charNum = [str]{
+    if(strLen(str) != 1, {
+        fail("charNum: The length of given string is not 1")
+    });
+    get8(str)
 };
 
 //--- Input/output ---//
@@ -387,6 +440,59 @@
     printStr(str);
     printStr(endlStr)
 };
+
+@printImpl = [argCount, args, newline]{
+    if(argCount, {
+        @fmt = *args;
+        @i = 0;
+        @argIdx = 1;
+
+        @writeStart = 0;
+        runWhileTrue({
+            @ch = get8(fmt + i);
+            ifElse(ch, {
+                ifElse(ch == charNum("%"), {
+                    writeStdout(fmt + writeStart, i - writeStart);
+                    ch = get8(fmt + i + 1);
+                    if(ch == 0, {
+                        fail("Unexpected end of print format string")
+                    });
+                    if(argIdx >= argCount, {
+                        fail("Not enough arguments given to print")
+                    });
+                    @arg = *(args + 4 * argIdx);
+                    argIdx = argIdx + 1;
+                    ifElse(ch == charNum("s"), {
+                        writeStdout(arg, strLen(arg))
+                    }, {
+                        if(ch != charNum("u"), {
+                            fail("Unknown print format placeholder")
+                        });
+                        printDec(arg)
+                    });
+                    i = i + 2;
+                    writeStart = i;
+                    1
+                }, {
+                    i = i + 1;
+                    1
+                })
+            }, {
+                0
+            })
+        });
+        writeStdout(fmt + writeStart, i - writeStart);
+        if(argIdx != argCount, {
+            fail("Extra arguments given to print")
+        })
+    });
+    if(newline, {
+        writeStdout(endlStr, 1)
+    });
+    0
+};
+@print = toVariadic([argCount, args]{ printImpl(argCount, args, 0) });
+@printL = toVariadic([argCount, args]{ printImpl(argCount, args, 1) });
 
 @inputLine = {
     @ret = brk;
@@ -464,13 +570,6 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
         fail("parseDec: The string is empty.")
     });
     val
-};
-
-@charNum = [str]{
-    if(strLen(str) != 1, {
-        fail("charNum: The length of given string is not 1")
-    });
-    get8(str)
 };
 
 //--- Helper functions for algorithms ---//

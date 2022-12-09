@@ -82,7 +82,7 @@ runWhileTrue({
     })
 });
 
-printDecL(sum1);
-printDecL(sum2);
+printL("%u", sum1);
+printL("%u", sum2);
 
 0

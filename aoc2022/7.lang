@@ -120,7 +120,7 @@ runWhileTrue({
     size
 };
 dfs1(rootDir);
-printDecL(sum1);
+printL("%u", sum1);
 
 @ret2 = 0 - 1;
 @dfs2 = [dir]{
@@ -137,6 +137,6 @@ printDecL(sum1);
     })
 };
 dfs2(rootDir);
-printDecL(ret2);
+printL("%u", ret2);
 
 0

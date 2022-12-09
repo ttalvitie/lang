@@ -12,7 +12,7 @@
 };
 
 @line = inputLine();
-printDecL(solve(line, 4));
-printDecL(solve(line, 14));
+printL("%u", solve(line, 4));
+printL("%u", solve(line, 14));
 
 0
