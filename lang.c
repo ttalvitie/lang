@@ -326,10 +326,6 @@ void compileFuncLiteral(u8* baseSlot, u32 argCount) {
     // Fill in argCountCorrectJumpPoint.
     writePtr(argCountCorrectJumpPointSlot, memPos);
 
-    // x: jne x: If the number of arguments is not 'argCount', loop infinitely. (TODO: Better error handling)
-    emitU8(0x75);
-    emitU8(0xFE);
-
     // push dword ['baseSlot']: Push the base pointer of the upper recursive call of this function to the stack.
     emitU8(0xFF);
     emitU8(0x35);
