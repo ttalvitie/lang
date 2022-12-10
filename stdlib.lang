@@ -471,71 +471,79 @@
     writeStdout(&digit, 1)
 };
 
-@printImpl = [argCount, args, newline]{
-    if(argCount, {
-        @fmt = *args;
-        @i = 0;
+@vPrint = [fmt, argCount, args]{
+    @i = 0;
 
-        @argIdx = 1;
-        @takeArg = {
-            if(argIdx >= argCount, {
-                fail("Not enough arguments given to print")
-            });
-            @arg = *(args + 4 * argIdx);
-            argIdx = argIdx + 1;
-            arg
-        };
-
-        @writeStart = 0;
-        runWhileTrue({
-            @ch = get8(fmt + i);
-            ifChain(
-                { ch == 0 }, {
-                    0
-                },
-                { ch == charNum("%") }, {
-                    writeStdout(fmt + writeStart, i - writeStart);
-                    ch = get8(fmt + i + 1);
-                    if(ch == 0, {
-                        fail("Unexpected end of print format string")
-                    });
-                    ifChain(
-                        { ch == charNum("s") }, {
-                            @arg = takeArg();
-                            writeStdout(arg, strLen(arg))
-                        },
-                        { ch == charNum("u") }, {
-                            printDec(takeArg())
-                        },
-                        { ch == charNum("%") }, {
-                            writeStdout("%", 1)
-                        },
-                        {
-                            fail("Unknown print format placeholder")
-                        }
-                    );
-                    i = i + 2;
-                    writeStart = i;
-                    1
-                },
-                {
-                    i = i + 1;
-                    1
-                }
-            )
+    @argIdx = 0;
+    @takeArg = {
+        if(argIdx >= argCount, {
+            fail("Not enough arguments given to print")
         });
-        writeStdout(fmt + writeStart, i - writeStart);
-        if(argIdx != argCount, {
-            fail("Extra arguments given to print")
-        })
+        @arg = *(args + 4 * argIdx);
+        argIdx = argIdx + 1;
+        arg
+    };
+
+    @writeStart = 0;
+    runWhileTrue({
+        @ch = get8(fmt + i);
+        ifChain(
+            { ch == 0 }, {
+                0
+            },
+            { ch == charNum("%") }, {
+                writeStdout(fmt + writeStart, i - writeStart);
+                ch = get8(fmt + i + 1);
+                if(ch == 0, {
+                    fail("Unexpected end of print format string")
+                });
+                ifChain(
+                    { ch == charNum("s") }, {
+                        @arg = takeArg();
+                        writeStdout(arg, strLen(arg))
+                    },
+                    { ch == charNum("u") }, {
+                        printDec(takeArg())
+                    },
+                    { ch == charNum("%") }, {
+                        writeStdout("%", 1)
+                    },
+                    {
+                        fail("Unknown print format placeholder")
+                    }
+                );
+                i = i + 2;
+                writeStart = i;
+                1
+            },
+            {
+                i = i + 1;
+                1
+            }
+        )
     });
-    if(newline, {
-        writeStdout(endlStr, 1)
-    });
-    0
+    writeStdout(fmt + writeStart, i - writeStart);
+    if(argIdx != argCount, {
+        fail("Extra arguments given to print")
+    })
 };
-@print = toVariadic([argCount, args]{ printImpl(argCount, args, 0) });
-@printL = toVariadic([argCount, args]{ printImpl(argCount, args, 1) });
+@vPrintL = [fmt, argCount, args]{
+    vPrint(fmt, argCount, args);
+    writeStdout(endlStr, 1)
+};
+
+@print = toVariadic([argCount, args]{
+    if(argCount, {
+        vPrint(*args, argCount - 1, args + 4)
+    })
+});
+@printL = toVariadic([argCount, args]{
+    ifElse(argCount, {
+        vPrintL(*args, argCount - 1, args + 4)
+    }, {
+        vPrintL("", 0, 0)
+    })
+});
 
 @inputLine = {
     @ret = brk;
