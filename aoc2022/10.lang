@@ -1,0 +1,114 @@
+@instrType = 0;
+@instrCyclesLeft = 0;
+@instrVal = 0;
+@getInstr = {
+    @line = inputLine();
+    @ch = get8(line);
+    ifChain(
+        { ch == 0 }, {
+            instrType = 0;
+            instrCyclesLeft = 1
+        },
+        { ch == charNum("n") }, {
+            assert(strEqual(line, "noop"));
+            instrType = 1;
+            instrCyclesLeft = 1
+        },
+        {
+            @len = strLen(line);
+            assert(len >= 5);
+            put8(line + 4, 0);
+            assert(strEqual(line, "addx"));
+            instrType = 2;
+            instrCyclesLeft = 2;
+            instrVal = ifElse(line >= 6 && get8(line + 5) == charNum("-"), {
+                0 - parseDec(line + 6)
+            }, {
+                parseDec(line + 5)
+            })
+        }
+    )
+};
+
+@ret1 = 0;
+
+@pixels = Vector.init(1);
+
+@val = 1;
+getInstr();
+@cycleIdx = 0;
+while({ instrType }, {
+    cycleIdx = cycleIdx + 1;
+    if((cycleIdx + 20) % 40 == 0 && cycleIdx <= 220, {
+        ret1 = ret1 + cycleIdx * val
+    });
+
+    @drawX = (cycleIdx - 1) % 40 + 1;
+    @pixel = charNum(ifElse(drawX - val < 3, { "#" }, { " " }));
+    put8(Vector.push(pixels), pixel);
+
+    instrCyclesLeft = instrCyclesLeft - 1;
+    if(instrCyclesLeft == 0, {
+        if(instrType == 2, {
+            val = val + instrVal
+        });
+        getInstr()
+    })
+});
+
+printL("%u", ret1);
+
+@w = 40;
+@h = 6;
+assert(Vector.size(pixels) == w * h);
+
+@matchFound = 0;
+@matchPixels = toVariadic([argCount, args]{
+    assert(argCount == h + 1);
+
+    @match = 1;
+    forRange(0, h, [y]{
+        @argLine = *(args + 4 * y);
+        assert(strLen(argLine) == w);
+        if(!memEqual(Vector.item(pixels, y * w), argLine, w), {
+            match = 0
+        })
+    });
+
+    assert(!match || !matchFound);
+
+    if(match, {
+        matchFound = 1;
+        printL("%s", *(args + 4 * h))
+    })
+});
+
+matchPixels(
+    "##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ",
+    "###   ###   ###   ###   ###   ###   ### ",
+    "####    ####    ####    ####    ####    ",
+    "#####     #####     #####     #####     ",
+    "######      ######      ######      ####",
+    "#######       #######       #######     ",
+    "XYZ"
+);
+
+matchPixels(
+    "###  #    #  # #    #  # ###  #### #  # ",
+    "#  # #    #  # #    # #  #  #    # #  # ",
+    "#  # #    #  # #    ##   ###    #  #### ",
+    "###  #    #  # #    # #  #  #  #   #  # ",
+    "#    #    #  # #    # #  #  # #    #  # ",
+    "#    ####  ##  #### #  # ###  #### #  # ",
+    "PLULKBZH"
+);
+
+if(!matchFound, {
+    printL("No match found, pixels:");
+    forRange(0, h, [y]{
+        writeStdout(Vector.item(pixels, y * w), w);
+        printL()
+    })
+});
+
+0

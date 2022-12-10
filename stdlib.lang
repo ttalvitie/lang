@@ -353,6 +353,29 @@
     })
 };
 
+@memEqual = [a, b, size]{
+    @ret = 1;
+    while({ ret && size >= 4 }, {
+        ifElse(*a == *b, {
+            a = a + 4;
+            b = b + 4;
+            size = size - 4
+        }, {
+            ret = 0
+        })
+    });
+    while({ ret && size }, {
+        ifElse(get8(a) == get8(b), {
+            a = a + 1;
+            b = b + 1;
+            size = size - 1
+        }, {
+            ret = 0
+        })
+    });
+    ret
+};
+
 @swapMem = [a, b, size]{
     copyMem(a, brk, size);
     copyMem(b, a, size);
