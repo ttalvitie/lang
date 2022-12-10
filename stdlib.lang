@@ -233,11 +233,10 @@
     _exit(code)
 };
 
-// Fail the program with given error message string. Does not return; exits program.
-// This implementation does not print anything, but it will be replaced later.
-@fail = [msg]{
+// fail([fmt, ...])
+@fail = toVariadic([argCount, args]{
     exit(1)
-};
+});
 
 //--- Control flow ---//
 
@@ -574,20 +573,32 @@
 
 //--- Error handling ---//
 
-fail = [msg]{
-    printL("FAIL: %s", msg);
+fail = toVariadic([argCount, args]{
+    ifElse(argCount, {
+        print("FAIL: ");
+        vPrintL(*args, argCount - 1, args + 4)
+    }, {
+        printL("FAIL")
+    });
 
     exit(1)
-};
+});
 
-@assertMsg = [cond, msg]{
-    if(!cond, { fail(msg) });
-    0
-};
-@assert = [cond]{
-    if(!cond, { fail("Assertion failed") });
-    0
-};
+// assert(cond, [fmt, ...])
+@assert = toVariadic([argCount, args]{
+    if(argCount == 0, {
+        fail("assert called with no arguments")
+    });
+    if(!*args, {
+        ifElse(argCount > 1, {
+            print("FAIL: Assertion failed: ");
+            vPrintL(*(args + 4), argCount - 2, args + 8)
+        }, {
+            printL("FAIL: Assertion failed")
+        });
+        exit(1)
+    })
+});
 
 // Replace the wrong number of arguments handler by one that prints the information to stdout.
 __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenArgCount]{
