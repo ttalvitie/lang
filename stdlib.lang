@@ -649,6 +649,21 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     val
 };
 
+@decToStr = [val]{
+    @impl = [x]{
+        @digit = x % 10;
+        @rest = x / 10;
+        if(rest, { impl(rest) });
+        put8(brk, digit + 48);
+        brk = brk + 1
+    };
+    @ret = brk;
+    impl(val);
+    put8(brk, 0);
+    brk = brk + 1;
+    ret
+};
+
 @vTryParseStr = [argCount, args]{
     if(argCount < 2, {
         fail("Not enough arguments given to parseStr")

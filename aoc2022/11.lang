@@ -90,6 +90,25 @@ while({ line = inputLine(); get8(line) }, {
     1
 });
 
+@printLargeMul = [x, y]{
+    @modulus = 1000000000;
+    @low = 0;
+    @high = 0;
+    forRange(0, x, [i]{
+        low = low + y;
+        while({ low >= modulus }, {
+            high = high + 1;
+            low = low - modulus
+        })
+    });
+    ifElse(high, {
+        print("%u", high);
+        printL("%s", decToStr(low + modulus) + 1)
+    }, {
+        printL("%u", low)
+    })
+};
+
 @solve = [monkeys, roundCount, worryDiv]{
     @modulus = ifElse(worryDiv > 1, {
         0 - 1
@@ -133,8 +152,7 @@ while({ line = inputLine(); get8(line) }, {
     });
 
     assert(Vector.size(monkeys) >= 2);
-//    printL("%u * %u", *Monkey.inspectionCount(Vector.item(monkeys, 0)), *Monkey.inspectionCount(Vector.item(monkeys, 1)));
-    printL("%u", *Monkey.inspectionCount(Vector.item(monkeys, 0)) * *Monkey.inspectionCount(Vector.item(monkeys, 1)))
+    printLargeMul(*Monkey.inspectionCount(Vector.item(monkeys, 0)), *Monkey.inspectionCount(Vector.item(monkeys, 1)))
 };
 
 @monkeys2 = Vector.init(Monkey.sizeof);
