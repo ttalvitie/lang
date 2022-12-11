@@ -118,7 +118,7 @@ void readCh() {
     } while(ch == ' ' || ch == '\n');
 }
 
-const size_t memSize = (size_t)1 << 22;
+const size_t memSize = (size_t)1 << 26;
 u8* memStart;
 u8* memEnd;
 u8* memPos;
@@ -132,11 +132,13 @@ void initMem() {
     memEnd = memStart + memSize;
     memPos = memStart;
 
+/*
     // Initialize memory with randomness to help catch bugs early.
     FILE* rng = fopen("/dev/urandom", "rb");
     if(rng == NULL || fread(memStart, 1, memSize, rng) != memSize || fclose(rng) != 0) {
         fail("Initializing memory from /dev/urandom failed.");
     }
+*/
 }
 
 void writePtr(u8* dest, void* ptr) {

@@ -264,6 +264,13 @@
     func()
 };
 
+@ifElse0 = [cond, trueFunc]{
+    ifElse(cond, trueFunc, { 0 })
+};
+@ifElse1 = [cond, trueFunc]{
+    ifElse(cond, trueFunc, { 1 })
+};
+
 @while = [condFunc, func]{
     runWhileTrue({
         ifElse(condFunc(), { func(); 1 }, { 0 })
@@ -313,6 +320,12 @@
         1
     })
 };
+
+@runArgsWhileTrue = toVariadic([argCount, args]{
+    forRangeWhileTrue(0, argCount, [i]{
+        (*(args + 4 * i))()
+    })
+});
 
 // ifChain(cond1, func1, cond2, func2, ..., condN, funcN, defaultFunc) calls funcI for the first
 // condI() that is nonzero or defaultFunc otherwise.
@@ -635,6 +648,127 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     });
     val
 };
+
+@vTryParseStr = [argCount, args]{
+    if(argCount < 2, {
+        fail("Not enough arguments given to parseStr")
+    });
+
+    @str = *args;
+    @fmt = *(args + 4);
+    args = args + 8;
+    argCount = argCount - 2;
+
+    // Consume format string prefix.
+    @match = 1;
+    runWhileTrue({
+        @fmtCh = get8(fmt);
+        ifElse0(fmtCh != 0 && fmtCh != charNum("%"), {
+            @strCh = get8(str);
+            ifElse(strCh == fmtCh, {
+                str = str + 1;
+                fmt = fmt + 1;
+                1
+            }, {
+                match = 0;
+                0
+            })
+        })
+    });
+
+    while({ match && get8(fmt) != 0 }, {
+        // Read directive.
+        assert(get8(fmt) == charNum("%"));
+        @directive = get8(fmt + 1);
+        assert(directive != 0, "Format string for tryParseStr ends too early (expected directive)");
+        fmt = fmt + 2;
+
+        // Read format string between this directive and the next directive (used for matching).
+        @matchStart = fmt;
+        runWhileTrue({
+            @ch = get8(fmt);
+            ifElse0(ch != 0 && ch != charNum("%"), {
+                fmt = fmt + 1;
+                1
+            })
+        });
+        @matchLen = fmt - matchStart;
+
+        // Read the string matching the directive to dirStr.
+        @dirStr = brk;
+        ifElse(matchLen == 0, {
+            assert(get8(fmt) == 0, "Format string in tryParseStr contains adjacent directives, which is not allowed");
+
+            // Write the rest of the input characters to dirStr.
+            runWhileTrue({
+                @ch = get8(str);
+                ifElse0(get8(str), {
+                    put8(brk, ch);
+                    brk = brk + 1;
+                    str = str + 1;
+                    1
+                })
+            })
+        }, {
+            // Write input characters to dirStr until the the string from matchStart to matchEnd is found.
+            runWhileTrue({
+                @found = forRangeWhileTrue(0, matchLen, [i]{
+                    @a = get8(matchStart + i);
+                    @b = get8(str + i);
+                    ifChain(
+                        { a == b }, { 1 },
+                        { b == 0 }, {
+                            // Input string ended; no matches are possible anymore.
+                            match = 0;
+                            0
+                        },
+                        { 0 }
+                    )
+                });
+                ifElse0(match && !found, {
+                    put8(brk, get8(str));
+                    brk = brk + 1;
+                    str = str + 1;
+                    1
+                })
+            })
+        });
+
+        if(match, {
+            str = str + matchLen;
+
+            put8(brk, 0);
+            brk = brk + 1;
+
+            assert(argCount != 0, "Not enough arguments given to tryParseStr");
+
+            ifChain(
+                { directive == charNum("s") }, {
+                    **args = dirStr
+                },
+                { directive == charNum("u") }, {
+                    **args = parseDec(dirStr)
+                },
+                { fail("Unknown tryParseStr directive") }
+            );
+            argCount = argCount - 1;
+            args = args + 4
+        })
+    });
+
+    if(match && get8(str) != 0, {
+        // Extra characters in str.
+        match = 0
+    });
+
+    assert(!match || argCount == 0, "Extra arguments given to tryParseStr");
+
+    match
+};
+@tryParseStr = toVariadic(vTryParseStr);
+@parseStr = toVariadic([args, argCount]{
+    assert(vTryParseStr(args, argCount), "parseStr failed")
+});
 
 //--- Algorithms ---//
 

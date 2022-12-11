@@ -1,0 +1,158 @@
+@Monkey.items = [monkey]{ monkey };
+@Monkey.operation = [monkey]{ monkey + 4 };
+@Monkey.operationVal = [monkey]{ monkey + 8 };
+@Monkey.divisor = [monkey]{ monkey + 12 };
+@Monkey.trueThrow = [monkey]{ monkey + 16 };
+@Monkey.falseThrow = [monkey]{ monkey + 20 };
+@Monkey.inspectionCount = [monkey]{ monkey + 24 };
+@Monkey.sizeof = 28;
+
+@monkeys1 = Vector.init(Monkey.sizeof);
+
+@line = 0;
+while({ line = inputLine(); get8(line) }, {
+    @monkeyIdx = 0;
+    parseStr(line, "Monkey %u:", &monkeyIdx);
+    assert(monkeyIdx == Vector.size(monkeys1));
+
+    @monkey = Vector.push(monkeys1);
+
+    line = inputLine();
+    @startingItemList = 0;
+    parseStr(line, "  Starting items: %s", &startingItemList);
+
+    *Monkey.items(monkey) = Vector.init(4);
+    runWhileTrue({
+        @item = 0;
+        @remainder = 0;
+        @continue = ifChain(
+            { tryParseStr(startingItemList, "%u, %s", &item, &remainder) }, {
+                startingItemList = remainder;
+                1
+            },
+            { tryParseStr(startingItemList, "%u", &item) }, {
+                0
+            },
+            { fail("Parsing item list failed") }
+        );
+        *Vector.push(*Monkey.items(monkey)) = item;
+        continue
+    });
+
+    line = inputLine();
+    @opVal = 0;
+    ifChain(
+        { tryParseStr(line, "  Operation: new = old * old") }, {
+            *Monkey.operation(monkey) = [x, val, modulus]{
+                // Avoid overflow using bit-by-bit multiplication.
+                @ret = 0;
+                @bits = x;
+                @term = x;
+                while({ bits }, {
+                    if(bitAnd(bits, 1), {
+                        ret = (ret + term) % modulus
+                    });
+                    term = 2 * term % modulus;
+                    bits = bits / 2
+                });
+                ret
+            }
+        },
+        { tryParseStr(line, "  Operation: new = old * %u", &opVal) }, {
+            *Monkey.operation(monkey) = [x, val, modulus]{
+                x * val % modulus
+            }
+        },
+        { tryParseStr(line, "  Operation: new = old + %u", &opVal) }, {
+            *Monkey.operation(monkey) = [x, val, modulus]{
+                (x + val) % modulus
+            }
+        },
+        { fail("Parsing operation failed") }
+    );
+    *Monkey.operationVal(monkey) = opVal;
+
+    line = inputLine();
+    parseStr(line, "  Test: divisible by %u", Monkey.divisor(monkey));
+
+    line = inputLine();
+    parseStr(line, "    If true: throw to monkey %u", Monkey.trueThrow(monkey));
+
+    line = inputLine();
+    parseStr(line, "    If false: throw to monkey %u", Monkey.falseThrow(monkey));
+
+    line = inputLine();
+    parseStr(line, "");
+
+    *Monkey.inspectionCount(monkey) = 0;
+
+    monkeyIdx = monkeyIdx + 1;
+    1
+});
+
+@solve = [monkeys, roundCount, worryDiv]{
+    @modulus = ifElse(worryDiv > 1, {
+        0 - 1
+    }, {
+        @ret = 1;
+        forRange(0, Vector.size(monkeys), [monkeyIdx]{
+            ret = ret * *Monkey.divisor(Vector.item(monkeys, monkeyIdx))
+        });
+        ret
+    });
+
+    @runRound = {
+        forRange(0, Vector.size(monkeys), [monkeyIdx]{
+            @monkey = Vector.item(monkeys, monkeyIdx);
+            @items = *Monkey.items(monkey);
+            *Monkey.items(monkey) = Vector.init(4);
+
+            *Monkey.inspectionCount(monkey) = *Monkey.inspectionCount(monkey) + Vector.size(items);
+
+            forRange(0, Vector.size(items), [itemIdx]{
+                @item = *Vector.item(items, itemIdx);
+                item = (*Monkey.operation(monkey))(item, *Monkey.operationVal(monkey), modulus);
+                item = item / worryDiv;
+                @throw = ifElse(item % *Monkey.divisor(monkey) == 0, {
+                    *Monkey.trueThrow(monkey)
+                }, {
+                    *Monkey.falseThrow(monkey)
+                });
+                assert(throw < Vector.size(monkeys));
+                *Vector.push(*Monkey.items(Vector.item(monkeys, throw))) = item
+            })
+        })
+    };
+
+    forRange(0, roundCount, [roundIdx]{
+        runRound()
+    });
+
+    Vector.sort(monkeys, [a, b]{
+        *Monkey.inspectionCount(a) > *Monkey.inspectionCount(b)
+    });
+
+    assert(Vector.size(monkeys) >= 2);
+//    printL("%u * %u", *Monkey.inspectionCount(Vector.item(monkeys, 0)), *Monkey.inspectionCount(Vector.item(monkeys, 1)));
+    printL("%u", *Monkey.inspectionCount(Vector.item(monkeys, 0)) * *Monkey.inspectionCount(Vector.item(monkeys, 1)))
+};
+
+@monkeys2 = Vector.init(Monkey.sizeof);
+forRange(0, Vector.size(monkeys1), [i]{
+    @src = Vector.item(monkeys1, i);
+    @dest = Vector.push(monkeys2);
+    copyMem(src, dest, Monkey.sizeof);
+
+    @srcItems = *Monkey.items(src);
+    @destItems = Vector.init(4);
+    *Monkey.items(dest) = destItems;
+
+    forRange(0, Vector.size(srcItems), [j]{
+        *Vector.push(destItems) = *Vector.item(srcItems, j)
+    })
+});
+
+solve(monkeys1, 20, 3);
+solve(monkeys2, 10000, 1);
+
+0
