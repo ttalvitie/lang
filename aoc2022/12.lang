@@ -1,0 +1,97 @@
+@w = 0;
+@heightmap = Vector.init(4);
+
+runWhileTrue({
+    @line = inputLine();
+    @len = strLen(line);
+    ifElse(len, {
+        ifElse(w, {
+            assert(len == w)
+        }, {
+            w = len
+        });
+        *Vector.push(heightmap) = line;
+        1
+    }, {
+        assert(w != 0);
+        0
+    })
+});
+
+@h = Vector.size(heightmap);
+
+@sx = 0 - 1;
+@sy = 0 - 1;
+@ex = 0 - 1;
+@ey = 0 - 1;
+
+forRange(0, h, [y]{
+    forRange(0, w, [x]{
+        @pCh = *Vector.item(heightmap, y) + x;
+        @ch = get8(pCh);
+        if(ch == charNum("S"), {
+            assert(sx == 0 - 1);
+            sx = x;
+            sy = y;
+            put8(pCh, charNum("a"))
+        });
+        if(ch == charNum("E"), {
+            assert(ex == 0 - 1);
+            ex = x;
+            ey = y;
+            put8(pCh, charNum("z"))
+        });
+        assert(charNum("a") <= get8(pCh) <= charNum("z"))
+    })
+});
+
+assert(sx != 0 - 1);
+assert(ex != 0 - 1);
+
+@distVec = Vector.init(4);
+forRange(0, w * h, [i]{
+    *Vector.push(distVec) = 0 - 1
+});
+
+@height = [x, y]{ get8(*Vector.item(heightmap, y) + x) - charNum("a") };
+@pDist = [x, y]{ Vector.item(distVec, y * w + x) };
+
+@queue = Vector.init(4);
+@queuePos = 0;
+
+*pDist(ex, ey) = 0;
+*Vector.push(queue) = ey * w + ex;
+
+while({ queuePos != Vector.size(queue) }, {
+    @pos = *Vector.item(queue, queuePos);
+    queuePos = queuePos + 1;
+    @x = pos % w;
+    @y = pos / w;
+
+    @consider = [dx, dy]{
+        @x2 = x + dx;
+        @y2 = y + dy;
+        if(x2 < w && y2 < h && height(x2, y2) + 1 >= height(x, y) && *pDist(x2, y2) == 0 - 1, {
+            *pDist(x2, y2) = *pDist(x, y) + 1;
+            *Vector.push(queue) = y2 * w + x2
+        })
+    };
+    consider(1, 0);
+    consider(0 - 1, 0);
+    consider(0, 1);
+    consider(0, 0 - 1)
+});
+
+printL("%u", *pDist(sx, sy));
+
+@ret2 = 0 - 1;
+forRange(0, h, [y]{
+    forRange(0, w, [x]{
+        if(height(x, y) == 0 && *pDist(x, y) < ret2, {
+            ret2 = *pDist(x, y)
+        })
+    })
+});
+printL("%u", ret2);
+
+0
