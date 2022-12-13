@@ -1,0 +1,152 @@
+@Packet.isVector = [packet]{ packet };
+@Packet.data = [packet]{ packet + 4 };
+@Packet.sizeof = 8;
+@Packet.init = {
+    @ret = brk;
+    brk = brk + Packet.sizeof;
+    ret
+};
+
+@parsePacket = [pStr]{
+    @packet = Packet.init();
+    ifElse(get8(*pStr) == charNum("["), {
+        *pStr = *pStr + 1;
+
+        @children = Vector.init(4);
+        ifElse(get8(*pStr) == charNum("]"), {
+            *pStr = *pStr + 1
+        }, {
+            runWhileTrue({
+                *Vector.push(children) = parsePacket(pStr);
+                @ch = get8(*pStr);
+                *pStr = *pStr + 1;
+                ifElse(ch == charNum("]"), {
+                    0
+                }, {
+                    assert(ch == charNum(","));
+                    1
+                })
+            })
+        });
+
+        *Packet.isVector(packet) = 1;
+        *Packet.data(packet) = children
+    }, {
+        assert(charNum("0") <= get8(*pStr) <= charNum("9"));
+        @val = 0;
+        while({ charNum("0") <= get8(*pStr) <= charNum("9") }, {
+            val = val * 10;
+            val = val + get8(*pStr) - charNum("0");
+            *pStr = *pStr + 1
+        });
+
+        *Packet.isVector(packet) = 0;
+        *Packet.data(packet) = val
+    });
+    packet
+};
+
+@toVector = [a]{
+    @children = Vector.init(4);
+    *Vector.push(children) = a;
+    @packet = Packet.init();
+    *Packet.isVector(packet) = 1;
+    *Packet.data(packet) = children;
+    packet
+};
+
+@cmp = [a, b]{
+    @aIsVec = *Packet.isVector(a);
+    @bIsVec = *Packet.isVector(b);
+    ifElse(aIsVec || bIsVec, {
+        if(!aIsVec, {
+            a = toVector(a)
+        });
+        if(!bIsVec, {
+            b = toVector(b)
+        });
+        @aVec = *Packet.data(a);
+        @bVec = *Packet.data(b);
+        @aLen = Vector.size(aVec);
+        @bLen = Vector.size(bVec);
+        @ret = 0;
+        @i = 0 - 1;
+        runWhileTrue({
+            i = i + 1;
+            ifChain(
+                { i == aLen && i == bLen }, { 0 },
+                { i == aLen }, { ret = 0 - 1; 0 },
+                { i == bLen }, { ret = 1; 0 },
+                {
+                    ret = cmp(*Vector.item(aVec, i), *Vector.item(bVec, i));
+                    ret == 0
+                }
+            )
+        });
+        ret
+    }, {
+        @aData = *Packet.data(a);
+        @bData = *Packet.data(b);
+        ifChain(
+            { aData == bData }, { 0 },
+            { aData < bData }, { 0 - 1 },
+            { 1 }
+        )
+    })
+};
+
+@allPackets = Vector.init(4);
+
+@i = 0;
+@ret1 = 0;
+runWhileTrue({
+    i = i + 1;
+
+    @a = inputLine();
+    @b = inputLine();
+
+    ifElse0(get8(a) != 0, {
+        assert(get8(b) != 0);
+        assert(get8(inputLine()) == 0);
+
+        @x = parsePacket(&a);
+        assert(get8(a) == 0);
+        @y = parsePacket(&b);
+        assert(get8(b) == 0);
+
+        if(cmp(x, y) != 1, {
+            ret1 = ret1 + i
+        });
+
+        *Vector.push(allPackets) = x;
+        *Vector.push(allPackets) = y;
+
+        1
+    })
+});
+
+printL("%u", ret1);
+
+@packet = "[[2]]";
+@div1 = parsePacket(&packet);
+packet = "[[6]]";
+@div2 = parsePacket(&packet);
+
+*Vector.push(allPackets) = div1;
+*Vector.push(allPackets) = div2;
+
+Vector.sort(allPackets, [a, b]{
+    cmp(*a, *b) == 0 - 1
+});
+
+@idx1 = 0;
+@idx2 = 0;
+forRange(0, Vector.size(allPackets), [j]{
+    @p = *Vector.item(allPackets, j);
+    if(cmp(p, div1) == 0, { idx1 = j + 1 });
+    if(cmp(p, div2) == 0, { idx2 = j + 1 })
+});
+
+printL("%u", idx1 * idx2);
+
+0
