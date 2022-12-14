@@ -41,11 +41,15 @@ runWhileTrue({
     })
 });
 
-assert(minX >= 3);
+@midX = 500;
 
-minX = minX - 2;
-maxX = maxX + 2;
 maxY = maxY + 2;
+
+assert(minX >= 3);
+assert(midX >= maxY + 2);
+
+minX = min(minX - 2, midX - maxY - 2);
+maxX = max(maxX + 2, midX + maxY + 2);
 
 @w = maxX - minX + 1;
 @h = maxY + 1;
@@ -83,42 +87,61 @@ forRange(0, Vector.size(paths), [i]{
     })
 });
 
-@ret1 = 0 - 1;
-runWhileTrue({
-    @x = 500;
-    @y = 0;
-    assert(*world(x, y) == 0);
-    @done = 0;
+@simulate = {
+    @ret = 0 - 1;
     runWhileTrue({
-        ifChain(
-            { y == maxY }, {
-                done = 1;
-                0
-            },
-            { *world(x, y + 1) == 0 }, {
-                y = y + 1;
-                1
-            },
-            { *world(x - 1, y + 1) == 0 }, {
-                x = x - 1;
-                y = y + 1;
-                1
-            },
-            { *world(x + 1, y + 1) == 0 }, {
-                x = x + 1;
-                y = y + 1;
-                1
-            },
-            {
-                *world(x, y) = 2;
-                0
-            }
-        )
+        @x = midX;
+        @y = 0;
+        @done = 0;
+        runWhileTrue({
+            ifChain(
+                { *world(x, y) != 0 }, {
+                    done = 1;
+                    0
+                },
+                { y == maxY }, {
+                    done = 1;
+                    0
+                },
+                { *world(x, y + 1) == 0 }, {
+                    y = y + 1;
+                    1
+                },
+                { *world(x - 1, y + 1) == 0 }, {
+                    x = x - 1;
+                    y = y + 1;
+                    1
+                },
+                { *world(x + 1, y + 1) == 0 }, {
+                    x = x + 1;
+                    y = y + 1;
+                    1
+                },
+                {
+                    *world(x, y) = 2;
+                    0
+                }
+            )
+        });
+        ret = ret + 1;
+        !done
     });
-    ret1 = ret1 + 1;
-    !done
+    ret
+};
+
+printL("%u", simulate());
+
+forRange(0, maxY + 1, [y]{
+    forRange(minX, maxX + 1, [x]{
+        if(*world(x, y) >= 2, {
+            *world(x, y) = 0
+        });
+        if(y == maxY, {
+            *world(x, y) = 1
+        })
+    })
 });
 
-printL("%u", ret1);
+printL("%u", simulate());
 
 0
