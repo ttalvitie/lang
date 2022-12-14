@@ -785,6 +785,15 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     assert(vTryParseStr(args, argCount), "parseStr failed")
 });
 
+//--- Math ---//
+
+@min = [a, b]{
+    ifElse(a < b, { a }, { b })
+};
+@max = [a, b]{
+    ifElse(a > b, { a }, { b })
+};
+
 //--- Algorithms ---//
 
 @makeHeap = [data, size, itemSize, cmp]{

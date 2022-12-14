@@ -1,0 +1,103 @@
+@Pos.x = [pos]{ pos + 0 };
+@Pos.y = [pos]{ pos + 4 };
+@Pos.sizeof = 8;
+
+@paths = Vector.init(4);
+
+@minX = 0 - 1;
+@maxX = 0;
+@minY = 0 - 1;
+@maxY = 0;
+
+runWhileTrue({
+    @line = inputLine();
+    ifElse0(get8(line), {
+        @path = Vector.init(Pos.sizeof);
+
+        runWhileTrue({
+            @x = 0;
+            @y = 0;
+            @remainder = 0;
+            @continue = ifElse(tryParseStr(line, "%u,%u -> %s", &x, &y, &remainder), {
+                line = remainder;
+                1
+            }, {
+                parseStr(line, "%u,%u", &x, &y);
+                0
+            });
+
+            minX = min(minX, x);
+            maxX = max(maxX, x);
+            minY = min(minY, y);
+            maxY = max(maxY, y);
+
+            @pos = Vector.push(path);
+            *Pos.x(pos) = x;
+            *Pos.y(pos) = y;
+
+            continue
+        });
+
+        *Vector.push(paths) = path;
+        1
+    })
+});
+
+assert(minX >= 3);
+assert(minY >= 3);
+
+minX = minX - 2;
+maxX = maxX + 2;
+minY = minY - 2;
+maxY = maxY + 2;
+
+@w = maxX - minX + 1;
+@h = maxY - minY + 1;
+
+@worldBuf = Vector.init(4);
+forRange(0, w * h, [i]{
+    *Vector.push(worldBuf) = 0
+});
+
+@world = [x, y]{
+    assert(minX <= x <= maxX);
+    assert(minY <= y <= maxY);
+
+    Vector.item(worldBuf, (y - minY) * w + (x - minX))
+};
+
+forRange(0, Vector.size(paths), [i]{
+    @path = *Vector.item(paths, i);
+    @x = 0;
+    @y = 0;
+    forRange(0, Vector.size(path), [j]{
+        @pos = Vector.item(path, j);
+        @tx = *Pos.x(pos);
+        @ty = *Pos.y(pos);
+        ifElse(j == 0, {
+            x = tx;
+            y = ty;
+            *world(x, y) = 1
+        }, {
+            while({ x < tx }, { x = x + 1; *world(x, y) = 1 });
+            while({ x > tx }, { x = x - 1; *world(x, y) = 1 });
+            while({ y < ty }, { y = y + 1; *world(x, y) = 1 });
+            while({ y > ty }, { y = y - 1; *world(x, y) = 1 })
+        })
+    })
+});
+
+forRange(minY, maxY + 1, [y]{
+    forRange(minX, maxX + 1, [x]{
+        @val = *world(x, y);
+        print("%s", ifChain(
+            { val == 0 }, { "." },
+            { val == 1 }, { "#" },
+            { val == 2 }, { "o" },
+            { "?" }
+        ))
+    });
+    printL()
+});
+
+0
