@@ -4,9 +4,8 @@
 
 @paths = Vector.init(4);
 
-@minX = 0 - 1;
-@maxX = 0;
-@minY = 0 - 1;
+@minX = 500;
+@maxX = 500;
 @maxY = 0;
 
 runWhileTrue({
@@ -28,7 +27,6 @@ runWhileTrue({
 
             minX = min(minX, x);
             maxX = max(maxX, x);
-            minY = min(minY, y);
             maxY = max(maxY, y);
 
             @pos = Vector.push(path);
@@ -44,15 +42,13 @@ runWhileTrue({
 });
 
 assert(minX >= 3);
-assert(minY >= 3);
 
 minX = minX - 2;
 maxX = maxX + 2;
-minY = minY - 2;
 maxY = maxY + 2;
 
 @w = maxX - minX + 1;
-@h = maxY - minY + 1;
+@h = maxY + 1;
 
 @worldBuf = Vector.init(4);
 forRange(0, w * h, [i]{
@@ -61,9 +57,9 @@ forRange(0, w * h, [i]{
 
 @world = [x, y]{
     assert(minX <= x <= maxX);
-    assert(minY <= y <= maxY);
+    assert(y <= maxY);
 
-    Vector.item(worldBuf, (y - minY) * w + (x - minX))
+    Vector.item(worldBuf, y * w + (x - minX))
 };
 
 forRange(0, Vector.size(paths), [i]{
@@ -87,17 +83,42 @@ forRange(0, Vector.size(paths), [i]{
     })
 });
 
-forRange(minY, maxY + 1, [y]{
-    forRange(minX, maxX + 1, [x]{
-        @val = *world(x, y);
-        print("%s", ifChain(
-            { val == 0 }, { "." },
-            { val == 1 }, { "#" },
-            { val == 2 }, { "o" },
-            { "?" }
-        ))
+@ret1 = 0 - 1;
+runWhileTrue({
+    @x = 500;
+    @y = 0;
+    assert(*world(x, y) == 0);
+    @done = 0;
+    runWhileTrue({
+        ifChain(
+            { y == maxY }, {
+                done = 1;
+                0
+            },
+            { *world(x, y + 1) == 0 }, {
+                y = y + 1;
+                1
+            },
+            { *world(x - 1, y + 1) == 0 }, {
+                x = x - 1;
+                y = y + 1;
+                1
+            },
+            { *world(x + 1, y + 1) == 0 }, {
+                x = x + 1;
+                y = y + 1;
+                1
+            },
+            {
+                *world(x, y) = 2;
+                0
+            }
+        )
     });
-    printL()
+    ret1 = ret1 + 1;
+    !done
 });
+
+printL("%u", ret1);
 
 0
