@@ -625,28 +625,44 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
 
 //--- String conversions ---//
 
-@parseDec = [str]{
+@tryParseDec = [str, pRet]{
+    @success = 1;
     @val = 0;
     @empty = 1;
     runWhileTrue({
         @ch = get8(str);
-        ifElse(ch, {
-            empty = 0;
-            if(!(#30 <= ch <= #39), {
-                fail("parseDec: Invalid decimal digit.")
-            });
-            val = 10 * val + (ch - #30);
-            str = str + 1;
-            1
-        }, {
-            // End of string.
-            0
-        })
+        ifChain(
+            { ch == 0 }, {
+                // End of string.
+                0
+            },
+            { #30 <= ch <= #39 }, {
+                empty = 0;
+                val = 10 * val + (ch - #30);
+                str = str + 1;
+                1
+            },
+            {
+                // Invalid decimal digit.
+                success = 0;
+                0
+            }
+        )
     });
     if(empty, {
-        fail("parseDec: The string is empty.")
+        success = 0
     });
-    val
+    if(success, {
+        *pRet = val
+    });
+    success
+};
+@parseDec = [str]{
+    @ret = 0;
+    if(!tryParseDec(str, &ret), {
+        fail("Parsing decimal integer failed")
+    });
+    ret
 };
 
 @decToStr = [val]{
@@ -762,7 +778,9 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
                     **args = dirStr
                 },
                 { directive == charNum("u") }, {
-                    **args = parseDec(dirStr)
+                    if(!tryParseDec(dirStr, *args), {
+                        match = 0
+                    })
                 },
                 { fail("Unknown tryParseStr directive") }
             );
@@ -792,6 +810,10 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
 };
 @max = [a, b]{
     ifElse(a > b, { a }, { b })
+};
+
+@absDiff = [a, b]{
+    max(a, b) - min(a, b)
 };
 
 //--- Algorithms ---//

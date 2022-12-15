@@ -1,0 +1,125 @@
+@coordOffset = 1000000000;
+
+@retY = 0;
+parseStr(inputLine(), "%u", &retY);
+
+retY = retY + coordOffset;
+
+@Item.sx = [item]{ item };
+@Item.sy = [item]{ item + 4 };
+@Item.bx = [item]{ item + 8 };
+@Item.by = [item]{ item + 12 };
+@Item.sizeof = 16;
+
+@EventType.beacon = 0;
+@EventType.start = 1;
+@EventType.end = 2;
+
+@Event.x = [event]{ event };
+@Event.type = [event]{ event + 4 };
+@Event.sizeof = 8;
+
+@items = Vector.init(Item.sizeof);
+@events = Vector.init(Event.sizeof);
+
+runWhileTrue({
+    @line = inputLine();
+    ifElse0(get8(line), {
+        @sxStr = 0;
+        @syStr = 0;
+        @bxStr = 0;
+        @byStr = 0;
+        parseStr(line, "Sensor at x=%s, y=%s: closest beacon is at x=%s, y=%s", &sxStr, &syStr, &bxStr, &byStr);
+
+        @parseCoord = [str]{
+            @coord = 0;
+            if(!tryParseStr(str, "%u", &coord), {
+                parseStr(str, "-%u", &coord);
+                coord = 0 - coord
+            });
+            coord = coord + coordOffset;
+            coord
+        };
+        @sx = parseCoord(sxStr);
+        @sy = parseCoord(syStr);
+        @bx = parseCoord(bxStr);
+        @by = parseCoord(byStr);
+
+        @item = Vector.push(items);
+        *Item.sx(item) = sx;
+        *Item.sy(item) = sy;
+        *Item.bx(item) = bx;
+        *Item.by(item) = by;
+
+        if(by == retY, {
+            @event = Vector.push(events);
+            *Event.x(event) = bx;
+            *Event.type(event) = EventType.beacon
+        });
+
+        @d = absDiff(sx, bx) + absDiff(sy, by);
+
+        @diffY = absDiff(sy, retY);
+        if(diffY <= d, {
+            @event = Vector.push(events);
+            *Event.x(event) = sx + diffY - d;
+            *Event.type(event) = EventType.start;
+            event = Vector.push(events);
+            *Event.x(event) = sx + d - diffY + 1;
+            *Event.type(event) = EventType.end
+        });
+
+        1
+    })
+});
+
+@solve1 = {
+    Vector.sort(events, [a, b]{
+        *Event.x(a) < *Event.x(b)
+    });
+
+    @ret = 0;
+
+    @prevX = 0;
+    @activeCount = 0;
+    @beaconCount = 0;
+    @prevBeacon = 0;
+    forRange(0, Vector.size(events), [i]{
+        @event = Vector.item(events, i);
+        @type = *Event.type(event);
+        @x = *Event.x(event);
+        if(i == 0, {
+            prevX = x
+        });
+
+        @advance = x - prevX;
+        if(activeCount != 0 && advance != 0, {
+            ret = ret + advance - beaconCount;
+            beaconCount = 0
+        });
+
+        ifChain(
+            { type == EventType.beacon }, {
+                if(x != prevBeacon, {
+                    beaconCount = beaconCount + 1;
+                    prevBeacon = x
+                })
+            },
+            { type == EventType.start }, {
+                activeCount = activeCount + 1
+            },
+            { type == EventType.end }, {
+                activeCount = activeCount - 1
+            },
+            { assert(0) }
+        );
+        prevX = x
+    });
+    assert(activeCount == 0);
+
+    ret
+};
+
+printL("%u", solve1());
+
+0
