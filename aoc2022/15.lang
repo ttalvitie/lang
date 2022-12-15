@@ -20,7 +20,6 @@ retY = retY + coordOffset;
 @Event.sizeof = 8;
 
 @items = Vector.init(Item.sizeof);
-@events = Vector.init(Event.sizeof);
 
 runWhileTrue({
     @line = inputLine();
@@ -51,7 +50,22 @@ runWhileTrue({
         *Item.bx(item) = bx;
         *Item.by(item) = by;
 
-        if(by == retY, {
+        1
+    })
+});
+
+@genEvents = [y, enableBeaconEvents]{
+    @events = Vector.init(Event.sizeof);
+
+    forRange(0, Vector.size(items), [i]{
+        @item = Vector.item(items, i);
+
+        @sx = *Item.sx(item);
+        @sy = *Item.sy(item);
+        @bx = *Item.bx(item);
+        @by = *Item.by(item);
+
+        if(enableBeaconEvents && by == y, {
             @event = Vector.push(events);
             *Event.x(event) = bx;
             *Event.type(event) = EventType.beacon
@@ -59,7 +73,7 @@ runWhileTrue({
 
         @d = absDiff(sx, bx) + absDiff(sy, by);
 
-        @diffY = absDiff(sy, retY);
+        @diffY = absDiff(sy, y);
         if(diffY <= d, {
             @event = Vector.push(events);
             *Event.x(event) = sx + diffY - d;
@@ -67,16 +81,18 @@ runWhileTrue({
             event = Vector.push(events);
             *Event.x(event) = sx + d - diffY + 1;
             *Event.type(event) = EventType.end
-        });
+        })
+    });
 
-        1
-    })
-});
-
-@solve1 = {
     Vector.sort(events, [a, b]{
         *Event.x(a) < *Event.x(b)
     });
+
+    events
+};
+
+@solve1 = {
+    @events = genEvents(retY, 1);
 
     @ret = 0;
 
