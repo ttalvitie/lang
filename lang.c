@@ -118,7 +118,7 @@ void readCh() {
     } while(ch == ' ' || ch == '\n');
 }
 
-const size_t memSize = (size_t)1 << 26;
+const size_t memSize = (size_t)1 << 31;
 u8* memStart;
 u8* memEnd;
 u8* memPos;

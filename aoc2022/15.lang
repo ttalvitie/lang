@@ -3,7 +3,13 @@
 @retY = 0;
 parseStr(inputLine(), "%u", &retY);
 
+@minCoord = 0;
+@maxCoord = 0;
+parseStr(inputLine(), "%u", &maxCoord);
+
 retY = retY + coordOffset;
+minCoord = minCoord + coordOffset;
+maxCoord = maxCoord + coordOffset;
 
 @Item.sx = [item]{ item };
 @Item.sy = [item]{ item + 4 };
@@ -14,6 +20,7 @@ retY = retY + coordOffset;
 @EventType.beacon = 0;
 @EventType.start = 1;
 @EventType.end = 2;
+@EventType.boundary = 3;
 
 @Event.x = [event]{ event };
 @Event.type = [event]{ event + 4 };
@@ -54,7 +61,7 @@ runWhileTrue({
     })
 });
 
-@genEvents = [y, enableBeaconEvents]{
+@genEvents = [y, enableBeaconEvents, enableBoundaryEvents]{
     @events = Vector.init(Event.sizeof);
 
     forRange(0, Vector.size(items), [i]{
@@ -84,6 +91,15 @@ runWhileTrue({
         })
     });
 
+    if(enableBoundaryEvents, {
+        @event = Vector.push(events);
+        *Event.x(event) = minCoord;
+        *Event.type(event) = EventType.boundary;
+        event = Vector.push(events);
+        *Event.x(event) = maxCoord;
+        *Event.type(event) = EventType.boundary
+    });
+
     Vector.sort(events, [a, b]{
         *Event.x(a) < *Event.x(b)
     });
@@ -92,7 +108,7 @@ runWhileTrue({
 };
 
 @solve1 = {
-    @events = genEvents(retY, 1);
+    @events = genEvents(retY, 1, 0);
 
     @ret = 0;
 
@@ -136,6 +152,79 @@ runWhileTrue({
     ret
 };
 
+@printLargeMul = [x, y]{
+    @modulus = 1000000000;
+    @low = 0;
+    @high = 0;
+    forRange(0, x, [i]{
+        low = low + y;
+        while({ low >= modulus }, {
+            high = high + 1;
+            low = low - modulus
+        })
+    });
+    ifElse(high, {
+        print("%u", high);
+        printL("%s", decToStr(low + modulus) + 1)
+    }, {
+        printL("%u", low)
+    })
+};
+
+@solve2 = {
+    @found = 0;
+
+    forRange(minCoord, maxCoord + 1, [y]{
+        @events = genEvents(y, 0, 1);
+
+        @prevX = 0;
+        @activeCount = 0;
+        forRange(0, Vector.size(events), [i]{
+            @event = Vector.item(events, i);
+            @type = *Event.type(event);
+            @x = *Event.x(event);
+            if(i == 0, {
+                prevX = x
+            });
+
+            @advance = x - prevX;
+            if(activeCount == 0 && advance != 0 && minCoord < x <= maxCoord, {
+                assert(advance == 1);
+                assert(!found);
+                found = 1;
+
+                @modulus = 1000000;
+                @high = 4 * (x - 1 - minCoord);
+                @low = y - minCoord;
+                while({ low >= modulus }, {
+                    low = low - modulus;
+                    high = high + 1
+                });
+                ifElse(high, {
+                    print("%u", high);
+                    printL("%s", decToStr(low + modulus) + 1)
+                }, {
+                    printL("%u", low)
+                })
+            });
+
+            ifChain(
+                { type == EventType.start }, {
+                    activeCount = activeCount + 1
+                },
+                { type == EventType.end }, {
+                    activeCount = activeCount - 1
+                },
+                { assert(type == EventType.boundary) }
+            );
+            prevX = x
+        })
+    });
+
+    assert(found)
+};
+
 printL("%u", solve1());
+solve2();
 
 0
