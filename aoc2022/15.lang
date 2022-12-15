@@ -23,8 +23,9 @@ maxCoord = maxCoord + coordOffset;
 @EventType.boundary = 3;
 
 @Event.x = [event]{ event };
-@Event.type = [event]{ event + 4 };
-@Event.sizeof = 8;
+@Event.dx = [event]{ event + 4 };
+@Event.type = [event]{ event + 8 };
+@Event.sizeof = 12;
 
 @items = Vector.init(Item.sizeof);
 
@@ -61,8 +62,15 @@ runWhileTrue({
     })
 });
 
-@genEvents = [y, enableBeaconEvents, enableBoundaryEvents]{
+@genEvents = [y, enableBeaconEvents, enableBoundaryEvents, pNextY]{
     @events = Vector.init(Event.sizeof);
+
+    @nextY = 0 - 1;
+    @addYEvent = [ey]{
+        if(y < ey < nextY, {
+            nextY = ey
+        })
+    };
 
     forRange(0, Vector.size(items), [i]{
         @item = Vector.item(items, i);
@@ -80,13 +88,19 @@ runWhileTrue({
 
         @d = absDiff(sx, bx) + absDiff(sy, by);
 
+        addYEvent(sy - d);
+        addYEvent(sy);
+        addYEvent(sy + d);
+
         @diffY = absDiff(sy, y);
         if(diffY <= d, {
             @event = Vector.push(events);
             *Event.x(event) = sx + diffY - d;
+            *Event.dx(event) = ifElse(y < sy, { 0 - 1 }, { 1 });
             *Event.type(event) = EventType.start;
             event = Vector.push(events);
             *Event.x(event) = sx + d - diffY + 1;
+            *Event.dx(event) = ifElse(y < sy, { 1 }, { 0 - 1 });
             *Event.type(event) = EventType.end
         })
     });
@@ -104,11 +118,34 @@ runWhileTrue({
         *Event.x(a) < *Event.x(b)
     });
 
+    @prevEvent = 0;
+    forRange(0, Vector.size(events), [i]{
+        @event = Vector.item(events, i);
+        @type = *Event.type(event);
+        if(type == EventType.start || type == EventType.end, {
+            if(prevEvent, {
+                @x1 = *Event.x(prevEvent);
+                @dx1 = *Event.dx(prevEvent);
+                @x2 = *Event.x(event);
+                @dx2 = *Event.dx(event);
+                if(dx1 == 1 && dx2 == 0 - 1, {
+                    @d = (x2 - x1 + 1) / 2;
+                    addYEvent(y + d - 1);
+                    addYEvent(y + d)
+                })
+            });
+            prevEvent = event
+        })
+    });
+
+    *pNextY = nextY;
+
     events
 };
 
 @solve1 = {
-    @events = genEvents(retY, 1, 0);
+    @nextY = 0;
+    @events = genEvents(retY, 1, 0, &nextY);
 
     @ret = 0;
 
@@ -174,8 +211,10 @@ runWhileTrue({
 @solve2 = {
     @found = 0;
 
-    forRange(minCoord, maxCoord + 1, [y]{
-        @events = genEvents(y, 0, 1);
+    @y = minCoord;
+    while({ y <= maxCoord }, {
+        @nextY = 0;
+        @events = genEvents(y, 0, 1, &nextY);
 
         @prevX = 0;
         @activeCount = 0;
@@ -218,10 +257,12 @@ runWhileTrue({
                 { assert(type == EventType.boundary) }
             );
             prevX = x
-        })
+        });
+
+        y = nextY
     });
 
-    assert(found)
+    assert(found, "No solution found")
 };
 
 printL("%u", solve1());
