@@ -1,0 +1,138 @@
+@valveCount = 0;
+@valveIdxs = Vector.init(4);
+forRange(0, 26 * 26, [i]{
+    *Vector.push(valveIdxs) = 0 - 1
+});
+
+@Valve.flow = [valve]{ valve };
+@Valve.tunnels = [valve]{ valve + 4 };
+@Valve.bit = [valve]{ valve + 8 };
+@Valve.sizeof = 12;
+
+@valves = Vector.init(Valve.sizeof);
+
+@valveNameToIdx = [name]{
+    assert(strLen(name) == 2);
+    @a = get8(name);
+    @b = get8(name + 1);
+    assert(charNum("A") <= a <= charNum("Z"));
+    assert(charNum("A") <= b <= charNum("Z"));
+    @i = 26 * (a - charNum("A")) + (b - charNum("A"));
+    @pIdx = Vector.item(valveIdxs, i);
+    if(*pIdx == 0 - 1, {
+        *pIdx = valveCount;
+        valveCount = valveCount + 1;
+        @valve = Vector.push(valves);
+        *Valve.flow(valve) = 0;
+        *Valve.tunnels(valve) = Vector.init(4)
+    });
+    *pIdx
+};
+
+@bitCoef = 1;
+
+runWhileTrue({
+    @line = inputLine();
+    ifElse0(get8(line), {
+        @name = 0;
+        @flow = 0;
+        @tunnelList = 0;
+        if(!tryParseStr(line, "Valve %s has flow rate=%u; tunnels lead to valves %s", &name, &flow, &tunnelList), {
+            parseStr(line, "Valve %s has flow rate=%u; tunnel leads to valve %s", &name, &flow, &tunnelList)
+        });
+
+        @valveIdx = valveNameToIdx(name);
+        @valve = Vector.item(valves, valveIdx);
+        *Valve.flow(valve) = flow;
+        @tunnels = *Valve.tunnels(valve);
+
+        if(flow > 0, {
+            *Valve.bit(valve) = bitCoef;
+            bitCoef = bitCoef * 2
+        });
+
+        runWhileTrue({
+            @tunnel = 0;
+            @continue = ifElse1(!tryParseStr(tunnelList, "%s, %s", &tunnel, &tunnelList), {
+                parseStr(tunnelList, "%s", &tunnel);
+                0
+            });
+            @tunnelIdx = valveNameToIdx(tunnel);
+            *Vector.push(tunnels) = tunnelIdx;
+            continue
+        });
+
+        1
+    })
+});
+
+@tableSize = valveCount * bitCoef;
+
+@currentTable = brk;
+brk = brk + 4 * tableSize;
+@nextTable = brk;
+brk = brk + 4 * tableSize;
+
+@clearTable = [table]{
+    forRange(0, tableSize, [i]{
+        *(table + 4 * i) = 0 - 1
+    })
+};
+clearTable(currentTable);
+
+*(currentTable + 4 * (valveNameToIdx("AA") * bitCoef + 0)) = 0;
+
+@stepCount = 30;
+forRange(0, stepCount, [stepIdx]{
+    clearTable(nextTable);
+
+    forRange(0, valveCount, [valveIdx]{
+        @valve = Vector.item(valves, valveIdx);
+        @flow = *Valve.flow(valve);
+        @tunnels = *Valve.tunnels(valve);
+        @valveBit = *Valve.bit(valve);
+
+        forRange(0, bitCoef, [bits]{
+            @oldVal = *(currentTable + 4 * (valveIdx * bitCoef + bits));
+            if(oldVal != 0 - 1, {
+                @account = [idx, val]{
+                    @p = nextTable + 4 * idx;
+                    if(*p == 0 - 1 || *p < val, {
+                        *p = val
+                    })
+                };
+
+                // Do nothing.
+                account(valveIdx * bitCoef + bits, oldVal);
+
+                // Go through tunnel.
+                forRange(0, Vector.size(tunnels), [j]{
+                    @dest = *Vector.item(tunnels, j);
+                    account(dest * bitCoef + bits, oldVal)
+                });
+
+                // Open valve.
+                if(flow > 0 && bitAnd(bits, valveBit) == 0, {
+                    account(valveIdx * bitCoef + bits + valveBit, oldVal + flow * (stepCount - 1 - stepIdx))
+                })
+            })
+        })
+    });
+
+    @tmp = currentTable;
+    currentTable = nextTable;
+    nextTable = tmp
+});
+
+@ret1 = 0;
+forRange(0, valveCount, [valveIdx]{
+    forRange(0, bitCoef, [bits]{
+        @val = *(currentTable + 4 * (valveIdx * bitCoef + bits));
+        if(val != 0 - 1 && val > ret1, {
+            ret1 = val
+        })
+    })
+});
+printL("%u", ret1);
+
+0
