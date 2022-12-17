@@ -126,14 +126,16 @@ runWhileTrue({
 @periodShaftHeight = computeShaftHeight() - origShaftHeight;
 @periodDropCount = dropCount - origDropCount;
 
-printL("dropCount = %u, periodDropCount = %u", dropCount, periodDropCount);
-
 // dropsToDo = (1000000000000 - dropCount) % periodDropCount
-@dropsToDo = ifChain(
-    { dropCount == 2057 && periodDropCount == 35 }, { 23 },
-    { dropCount == 3747 && periodDropCount == 1725 }, { 1303 },
-    { assert(0) }
-);
+@dropsToDo = 1;
+forRange(0, 12, [i]{
+    dropsToDo = (10 * dropsToDo) % periodDropCount
+});
+while({ dropsToDo < dropCount }, {
+    dropsToDo = dropsToDo + periodDropCount
+});
+dropsToDo = dropsToDo - dropCount;
+
 forRange(0, dropsToDo, [i]{
     dropNextPiece()
 });
