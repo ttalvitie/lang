@@ -1,0 +1,143 @@
+@width = 7;
+
+@jetPattern = inputLine();
+@jetPatternLen = strLen(jetPattern);
+@jetIdx = 0;
+
+@piecePattern = Vector.init(4);
+@pieceIdx = 0;
+*Vector.push(piecePattern) = #F;
+*Vector.push(piecePattern) = #272;
+*Vector.push(piecePattern) = #447;
+*Vector.push(piecePattern) = #1111;
+*Vector.push(piecePattern) = #33;
+
+@shaft = Vector.init(4);
+*Vector.push(shaft) = shiftLeft(1, width) - 1;
+
+@dropCount = 0;
+@dropNextPiece = {
+    dropCount = dropCount + 1;
+
+    @piece = *Vector.item(piecePattern, pieceIdx);
+    pieceIdx = (pieceIdx + 1) % Vector.size(piecePattern);
+
+    @pieceHeight = 0;
+    while({ shiftRight(piece, 4 * pieceHeight) != 0 }, {
+        pieceHeight = pieceHeight + 1
+    });
+
+    @pieceWidth = 4;
+    while({ bitAnd(shiftLeft(#11111111, pieceWidth - 1), piece) == 0 }, {
+        pieceWidth = pieceWidth - 1
+    });
+
+    forRange(0, pieceHeight + 3, [y]{
+        *Vector.push(shaft) = 0
+    });
+
+    @pieceX = 2;
+    @pieceY = Vector.size(shaft) - pieceHeight;
+
+    @isClear = {
+        forRangeWhileTrue(0, pieceHeight, [y]{
+            !bitAnd(*Vector.item(shaft, pieceY + y), shiftLeft(bitAnd(shiftRight(piece, 4 * y), #F), pieceX))
+        })
+    };
+
+    runWhileTrue({
+        @jet = get8(jetPattern + jetIdx);
+        jetIdx = (jetIdx + 1) % jetPatternLen;
+        ifElse(jet == charNum("<"), {
+            if(pieceX != 0, {
+                pieceX = pieceX - 1;
+                if(!isClear(), {
+                    pieceX = pieceX + 1
+                })
+            })
+        }, {
+            assert(jet == charNum(">"));
+            if(pieceX + pieceWidth != width, {
+                pieceX = pieceX + 1;
+                if(!isClear(), {
+                    pieceX = pieceX - 1
+                })
+            })
+        });
+        pieceY = pieceY - 1;
+        ifElse(isClear(), {
+            1
+        }, {
+            pieceY = pieceY + 1;
+            0
+        })
+    });
+
+    forRangeWhileTrue(0, pieceHeight, [y]{
+        @pRow = Vector.item(shaft, pieceY + y);
+        *pRow = bitOr(*pRow, shiftLeft(bitAnd(shiftRight(piece, 4 * y), #F), pieceX))
+    });
+
+    while({ *Vector.item(shaft, Vector.size(shaft) - 1) == 0 }, {
+        Vector.pop(shaft)
+    })
+};
+
+while({ dropCount < 2022 }, {
+    dropNextPiece()
+});
+
+@visualize = {
+    forRevRange(0, Vector.size(shaft), [y]{
+        forRange(0, width, [x]{
+            print("%s", ifElse(bitAnd(shiftRight(*Vector.item(shaft, y), x), 1), { "#" }, { "." }))
+        });
+        printL()
+    })
+};
+//visualize();
+
+@computeShaftHeight = {
+    Vector.size(shaft) - 1
+};
+
+printL("%u", computeShaftHeight());
+
+@computeSignature = {
+    @ret = 0;
+    forRange(0, 4, [i]{
+        ret = shiftLeft(ret, 8);
+        ret = bitOr(ret, *Vector.item(shaft, Vector.size(shaft) - 1 - i))
+    });
+    ret
+};
+
+@origShaftHeight = computeShaftHeight();
+@origDropCount = dropCount;
+@origJetIdx = jetIdx;
+@origPieceIdx = pieceIdx;
+@origSignature = computeSignature();
+
+runWhileTrue({
+    dropNextPiece();
+    jetIdx != origJetIdx || pieceIdx != origPieceIdx || computeSignature() != origSignature
+});
+
+@periodShaftHeight = computeShaftHeight() - origShaftHeight;
+@periodDropCount = dropCount - origDropCount;
+
+printL("dropCount = %u, periodDropCount = %u", dropCount, periodDropCount);
+
+// dropsToDo = (1000000000000 - dropCount) % periodDropCount
+@dropsToDo = ifChain(
+    { dropCount == 2057 && periodDropCount == 35 }, { 23 },
+    { dropCount == 3747 && periodDropCount == 1725 }, { 1303 },
+    { assert(0) }
+);
+forRange(0, dropsToDo, [i]{
+    dropNextPiece()
+});
+
+printL("%u + ((1000000000000 - %u) / %u) * %u", computeShaftHeight(), dropCount, periodDropCount, periodShaftHeight);
+
+0

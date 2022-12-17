@@ -924,6 +924,14 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     Vector.item(vector, oldSize)
 };
 
+@Vector.pop = [vector]{
+    @size = *Vector_size(vector);
+    assert(size != 0, "Pop from empty Vector");
+    size = size - 1;
+    *Vector_size(vector) = size;
+    Vector.item(vector, size)
+};
+
 @Vector.sort = [vector, cmp]{
     sort(Vector.data(vector), Vector.size(vector), *Vector_itemSize(vector), cmp)
 };
