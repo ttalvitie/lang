@@ -172,6 +172,24 @@
 //
 @_shiftRightMasked = $5D83F80275FE5859D3E8FFE5;
 
+// _fullMul(a, b, pLow, pHigh): Compute the product of 'a' and 'b', saving the low bits to *pLow and high bits to *pHigh.
+//
+// Implementation in NASM syntax:
+//          pop ebp             ; Pop the return address to ebp.
+//          cmp eax, 4
+//  fail:   jne fail            ; If the number of arguments is not 2, loop forever.
+//          pop eax             ; Pop 'a' to eax.
+//          pop ebx             ; Pop 'b' to ebx.
+//          mul ebx             ; Compute the product 'a * b', saving the low bits to eax and high bits to edx.
+//          pop ebx             ; Pop 'pLow' to ebx.
+//          pop ecx             ; Pop 'pHigh' to ecx.
+//          mov [ebx], eax      ; Save the low bits to *pLow.
+//          mov [ecx], edx      ; Save the high bits to *pHigh.
+//          mov eax, 0          ; Set the return value in eax to 0.
+//          jmp ebp             ; Return to the return address.
+//
+@_fullMul = $5D83F80475FE585BF7E35B5989038911B800000000FFE5;
+
 //--- Memory access ---//
 
 @get8 = [addr]{
@@ -940,6 +958,140 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
 
 @Vector.sort = [vector, cmp]{
     sort(Vector.data(vector), Vector.size(vector), *Vector_itemSize(vector), cmp)
+};
+
+//--- Int: Arbitrary-size unsigned integer ---//
+
+@Int.init = [val]{
+    @ret = brk;
+    ifElse(val, {
+        brk = brk + 8;
+        *ret = 1;
+        *(ret + 4) = val
+    }, {
+        brk = brk + 4;
+        *ret = 0
+    });
+    ret
+};
+
+@Int.eq = [a, b]{
+    ifElse0(*a == *b, {
+        forRangeWhileTrue(0, *a, [i]{
+            *(a + 4 * (i + 1)) == *(b + 4 * (i + 1))
+        })
+    })
+};
+@Int.lt = [a, b]{
+    ifElse(*a != *b, {
+        *a < *b
+    }, {
+        @ret = 0;
+        forRevRangeWhileTrue(0, *a, [i]{
+            @x = *(a + 4 * (i + 1));
+            @y = *(b + 4 * (i + 1));
+            ifElse(x != y, {
+                ret = x < y;
+                0
+            }, {
+                1
+            })
+        });
+        ret
+    })
+};
+
+@Int.neq = [a, b]{ !Int.eq(b, a) };
+@Int.gt = [a, b]{ Int.lt(b, a) };
+@Int.leq = [a, b]{ !Int.gt(a, b) };
+@Int.geq = [a, b]{ !Int.lt(a, b) };
+
+@Int.add = [a, b]{
+    @ret = brk;
+    brk = brk + 4;
+
+    @n = max(*a, *b) + 1;
+    @carry = 0;
+    forRange(0, n, [i]{
+        @x = ifElse(i < *a, { *(a + 4 * (i + 1)) }, { 0 });
+        @y = ifElse(i < *b, { *(b + 4 * (i + 1)) }, { 0 });
+        @z = x + y + carry;
+        *brk = z;
+        brk = brk + 4;
+        carry = ifElse(carry, { z <= x }, { z < x })
+    });
+
+    while({ n > 0 && *(ret + 4 * n) == 0 }, { n = n - 1 });
+    *ret = n;
+    ret
+};
+@Int.sub = [a, b]{
+    @ret = brk;
+    brk = brk + 4;
+
+    @n = max(*a, *b);
+    @carry = 1;
+    forRange(0, n, [i]{
+        @x = ifElse(i < *a, { *(a + 4 * (i + 1)) }, { 0 });
+        @y = bitNot(ifElse(i < *b, { *(b + 4 * (i + 1)) }, { 0 }));
+        @z = x + y + carry;
+        *brk = z;
+        brk = brk + 4;
+        carry = ifElse(carry, { z <= x }, { z < x })
+    });
+    assert(carry, "Int.sub result is not nonnegative");
+
+    while({ n > 0 && *(ret + 4 * n) == 0 }, { n = n - 1 });
+    *ret = n;
+    ret
+};
+@Int.mul = [a, b]{
+    @ret = brk;
+    brk = brk + 4;
+
+    @n = *a + *b;
+    forRange(0, n, [i]{
+        *brk = 0;
+        brk = brk + 4
+    });
+
+    forRange(0, *a, [i]{
+        forRange(0, *b, [j]{
+            @low = 0;
+            @high = 0;
+            _fullMul(*(a + 4 * (i + 1)), *(b + 4 * (j + 1)), &low, &high);
+            @pDest = ret + 4 * (i + j + 1);
+            *pDest = *pDest + low;
+            @carry = *pDest < low;
+            pDest = pDest + 4;
+            *pDest = *pDest + high + carry;
+            carry = ifElse(carry, { *pDest <= high }, { *pDest < high });
+            while({ carry }, {
+                pDest = pDest + 4;
+                *pDest = *pDest + 1;
+                carry = *pDest == 0
+            })
+        })
+    });
+
+    while({ n > 0 && *(ret + 4 * n) == 0 }, { n = n - 1 });
+    *ret = n;
+    ret
+};
+@Int.div = [a, b]{
+    assert(Int.neq(b, Int.init(0)));
+    ifElse(Int.lt(a, b), {
+        Int.init(0)
+    }, {
+        @val = Int.div(a, Int.add(b, b));
+        val = Int.add(val, val);
+        @val2 = Int.add(val, Int.init(1));
+        ifElse(Int.leq(Int.mul(val2, b), a), { val2 }, { val })
+    })
+};
+@Int.rem = [a, b]{
+    @d = Int.div(a, b);
+    Int.sub(a, Int.mul(d, b))
 };
 
 //------------------------------------------------------------------------------------------------//
