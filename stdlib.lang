@@ -1094,6 +1094,41 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     Int.sub(a, Int.mul(d, b))
 };
 
+@Int.get = [val]{
+    assert(*val <= 1, "Int.get: value is too large");
+    ifElse(*val, { *(val + 4) }, { 0 })
+};
+
+@Int.fromDec = [str]{
+    @val = Int.init(0);
+    while({ get8(str) != 0 }, {
+        @ch = get8(str);
+        str = str + 1;
+        assert(charNum("0") <= ch <= charNum("9"), "Int.fromDec: Invalid decimal digit");
+        val = Int.mul(val, Int.init(10));
+        val = Int.add(val, Int.init(ch - charNum("0")))
+    });
+    val
+};
+@Int.toDec = [val]{
+    @ret = 0;
+    @recursion = [left]{
+        @digit = charNum("0") + Int.get(Int.rem(left, Int.init(10)));
+        @tail = Int.div(left, Int.init(10));
+        ifElse(Int.eq(tail, Int.init(0)), {
+            ret = brk
+        }, {
+            recursion(tail)
+        });
+        put8(brk, digit);
+        brk = brk + 1
+    };
+    recursion(val);
+    put8(brk, 0);
+    brk = brk + 1;
+    ret
+};
+
 //------------------------------------------------------------------------------------------------//
 // PROGRAM                                                                                        //
 //------------------------------------------------------------------------------------------------//

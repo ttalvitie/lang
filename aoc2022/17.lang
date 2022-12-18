@@ -127,19 +127,13 @@ runWhileTrue({
 @periodDropCount = dropCount - origDropCount;
 
 // dropsToDo = (1000000000000 - dropCount) % periodDropCount
-@dropsToDo = 1;
-forRange(0, 12, [i]{
-    dropsToDo = (10 * dropsToDo) % periodDropCount
-});
-while({ dropsToDo < dropCount }, {
-    dropsToDo = dropsToDo + periodDropCount
-});
-dropsToDo = dropsToDo - dropCount;
+@dropsToDo = Int.get(Int.rem(Int.sub(Int.fromDec("1000000000000"), Int.init(dropCount)), Int.init(periodDropCount)));
 
 forRange(0, dropsToDo, [i]{
     dropNextPiece()
 });
 
-printL("%u + ((1000000000000 - %u) / %u) * %u", computeShaftHeight(), dropCount, periodDropCount, periodShaftHeight);
+// computeShaftHeight() + ((1000000000000 - dropCount) / perioddropCount) * periodShaftHeight
+printL("%s", Int.toDec(Int.add(Int.init(computeShaftHeight()), Int.mul(Int.div(Int.sub(Int.fromDec("1000000000000"), Int.init(dropCount)), Int.init(periodDropCount)), Int.init(periodShaftHeight)))));
 
 0
