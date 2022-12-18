@@ -1,0 +1,113 @@
+@Vec3.x = [v]{ v };
+@Vec3.y = [v]{ v + 4 };
+@Vec3.z = [v]{ v + 8 };
+@Vec3.set = [v, x, y, z]{
+    *Vec3.x(v) = x;
+    *Vec3.y(v) = y;
+    *Vec3.z(v) = z
+};
+@Vec3.sizeof = 12;
+@Vec3.alloc = {
+    @ret = brk;
+    brk = brk + Vec3.sizeof;
+    ret
+};
+
+@cubes = Vector.init(Vec3.sizeof);
+
+runWhileTrue({
+    @line = inputLine();
+    ifElse0(get8(line), {
+        @cube = Vector.push(cubes);
+        parseStr(line, "%u,%u,%u", Vec3.x(cube), Vec3.y(cube), Vec3.z(cube));
+        *Vec3.x(cube) = *Vec3.x(cube) + 1;
+        *Vec3.y(cube) = *Vec3.y(cube) + 1;
+        *Vec3.z(cube) = *Vec3.z(cube) + 1;
+        1
+    })
+});
+
+@cmp = [a, b]{
+    ifChain(
+        { *Vec3.z(a) != *Vec3.z(b) }, { *Vec3.z(a) < *Vec3.z(b) },
+        { *Vec3.y(a) != *Vec3.y(b) }, { *Vec3.y(a) < *Vec3.y(b) },
+        { *Vec3.x(a) < *Vec3.x(b) }
+    )
+};
+
+Vector.sort(cubes, cmp);
+
+@ret = 6 * Vector.size(cubes);
+
+@scan = [pI, cube]{
+    @i = *pI;
+    while({ i < Vector.size(cubes) && cmp(Vector.item(cubes, i), cube) }, { i = i + 1 });
+    *pI = i;
+    i < Vector.size(cubes) && !cmp(cube, Vector.item(cubes, i))
+};
+
+@cube2 = Vec3.alloc();
+@iX = 0;
+@iY = 0;
+@iZ = 0;
+Vector.forEach(cubes, [cube]{
+    @x = *Vec3.x(cube);
+    @y = *Vec3.y(cube);
+    @z = *Vec3.z(cube);
+
+    Vec3.set(cube2, x - 1, y, z);
+    if(scan(&iX, cube2), { ret = ret - 2 });
+
+    Vec3.set(cube2, x, y - 1, z);
+    if(scan(&iY, cube2), { ret = ret - 2 });
+
+    Vec3.set(cube2, x, y, z - 1);
+    if(scan(&iZ, cube2), { ret = ret - 2 })
+});
+
+printL("%u", ret);
+
+@sX = 0;
+@sY = 0;
+@sZ = 0;
+Vector.forEach(cubes, [cube]{
+    sX = max(sX, *Vec3.x(cube));
+    sY = max(sY, *Vec3.y(cube));
+    sZ = max(sZ, *Vec3.z(cube))
+});
+sX = sX + 2;
+sY = sY + 2;
+sZ = sZ + 2;
+
+@sXYZ = sX * sY * sZ;
+@map = Vector.init(4);
+forRange(0, sXYZ, [i]{
+    *Vector.push(map) = 0
+});
+
+Vector.forEach(cubes, [cube]{
+    *Vector.item(map, *Vec3.x(cube) + sX * (*Vec3.y(cube) + sY * *Vec3.z(cube))) = 1
+});
+
+@ret2 = 0;
+@dfs = [x, y, z]{
+    if(x != 0 - 1 && x != sX && y != 0 - 1 && y != sY && z != 0 - 1 && z != sZ, {
+        @p = Vector.item(map, x + sX * (y + sY * z));
+        if(*p == 1, {
+            ret2 = ret2 + 1
+        });
+        if(*p == 0, {
+            *p = 2;
+            dfs(x - 1, y, z);
+            dfs(x + 1, y, z);
+            dfs(x, y - 1, z);
+            dfs(x, y + 1, z);
+            dfs(x, y, z - 1);
+            dfs(x, y, z + 1)
+        })
+    })
+};
+dfs(0, 0, 0);
+printL("%u", ret2);
+
+0

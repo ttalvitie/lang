@@ -907,6 +907,12 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     *Vector_data(vector) + *Vector_itemSize(vector) * i
 };
 
+@Vector.forEach = [vector, func]{
+    forRange(0, Vector.size(vector), [i]{
+        func(Vector.item(vector, i))
+    })
+};
+
 @Vector.push = [vector]{
     @itemSize = *Vector_itemSize(vector);
     @oldSize = *Vector_size(vector);
