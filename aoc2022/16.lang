@@ -29,7 +29,7 @@ forRange(0, 26 * 26, [i]{
     *pIdx
 };
 
-@bitCoef = 1;
+@bitFlow = Vector.init(4);
 
 runWhileTrue({
     @line = inputLine();
@@ -47,8 +47,8 @@ runWhileTrue({
         @tunnels = *Valve.tunnels(valve);
 
         if(flow > 0, {
-            *Valve.bit(valve) = bitCoef;
-            bitCoef = bitCoef * 2
+            *Valve.bit(valve) = shiftLeft(1, Vector.size(bitFlow));
+            *Vector.push(bitFlow) = flow
         });
 
         runWhileTrue({
@@ -66,108 +66,11 @@ runWhileTrue({
     })
 });
 
-@tableSize = valveCount * bitCoef;
-
-@currentTable = brk;
-brk = brk + 4 * tableSize;
-@nextTable = brk;
-brk = brk + 4 * tableSize;
-
-@clearTable = [table]{
-    forRange(0, tableSize, [i]{
-        *(table + 4 * i) = 0 - 1
-    })
+@solve = [teamSize, minuteCount]{
+    printL("%u", 0)
 };
 
-@account = [idx, val]{
-    @p = nextTable + 4 * idx;
-    if(*p == 0 - 1 || *p < val, {
-        *p = val
-    })
-};
-
-@runStep = [stepsLeft]{
-    clearTable(nextTable);
-
-    forRange(0, valveCount, [valveIdx]{
-        @valve = Vector.item(valves, valveIdx);
-        @flow = *Valve.flow(valve);
-        @tunnels = *Valve.tunnels(valve);
-        @valveBit = *Valve.bit(valve);
-
-        forRange(0, bitCoef, [bits]{
-            @oldVal = *(currentTable + 4 * (valveIdx * bitCoef + bits));
-            if(oldVal != 0 - 1, {
-                // Do nothing.
-                account(valveIdx * bitCoef + bits, oldVal);
-
-                // Go through tunnel.
-                forRange(0, Vector.size(tunnels), [j]{
-                    @dest = *Vector.item(tunnels, j);
-                    account(dest * bitCoef + bits, oldVal)
-                });
-
-                // Open valve.
-                if(flow > 0 && bitAnd(bits, valveBit) == 0, {
-                    account(valveIdx * bitCoef + bits + valveBit, oldVal + flow * stepsLeft)
-                })
-            })
-        })
-    });
-
-    @tmp = currentTable;
-    currentTable = nextTable;
-    nextTable = tmp
-};
-
-@runSteps = [stepCount]{
-    forRange(0, stepCount, [stepIdx]{
-        runStep(stepCount - 1 - stepIdx)
-    })
-};
-
-@computeResult = {
-    @ret = 0;
-    forRange(0, valveCount, [valveIdx]{
-        forRange(0, bitCoef, [bits]{
-            @val = *(currentTable + 4 * (valveIdx * bitCoef + bits));
-            if(val != 0 - 1 && val > ret, {
-                ret = val
-            })
-        })
-    });
-    ret
-};
-
-@startValveIdx = valveNameToIdx("AA");
-
-clearTable(currentTable);
-*(currentTable + 4 * (startValveIdx * bitCoef + 0)) = 0;
-runSteps(30);
-printL("%u", computeResult());
-
-@reinit = {
-    clearTable(nextTable);
-
-    forRange(0, valveCount, [valveIdx]{
-        forRange(0, bitCoef, [bits]{
-            @oldVal = *(currentTable + 4 * (valveIdx * bitCoef + bits));
-            if(oldVal != 0 - 1, {
-                account(startValveIdx * bitCoef + bits, oldVal)
-            })
-        })
-    });
-
-    @tmp = currentTable;
-    currentTable = nextTable;
-    nextTable = tmp
-};
-
-clearTable(currentTable);
-*(currentTable + 4 * (startValveIdx * bitCoef + 0)) = 0;
-runSteps(26);
-reinit();
-runSteps(26);
-printL("%u", computeResult());
+solve(1, 30);
+solve(2, 26);
 
 0
