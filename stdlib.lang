@@ -1055,9 +1055,17 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     ret
 };
 
+// Hash 32-bit unsigned integer.
+@hashU32 = [val]{
+    @hash = bitXor(shiftRight(val, 16), val) * #45D9F3B;
+    hash = bitXor(shiftRight(hash, 16), hash) * #45D9F3B;
+    hash = bitXor(shiftRight(hash, 16), hash);
+    hash
+};
+
 //--- A* algorithm ---//
 
-@aStar = [start, startDist, reuseHashtable, isEndFunc, neighborFunc, heuristicFunc]{
+@aStar = [start, startDist, reuseHashtable, isEndFunc, neighborFunc, heuristicFunc, nodeHashFunc, nodeEqFunc]{
     @Entry.node = [entry]{ entry + 0 };  // Node is first to allow easy comparison in hashtable.
     @Entry.dist = [entry]{ entry + 4 };
     @Entry.heuristic = [entry]{ entry + 8 };
@@ -1070,13 +1078,9 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
 
     @hashtable = reuseHashtable;
     HashTable.reinit(hashtable, [entry]{
-        @hash = *Entry.node(entry);
-        hash = bitXor(shiftRight(hash, 16), hash) * #45D9F3B;
-        hash = bitXor(shiftRight(hash, 16), hash) * #45D9F3B;
-        hash = bitXor(shiftRight(hash, 16), hash);
-        hash
+        nodeHashFunc(*Entry.node(entry))
     }, [entry1, entry2]{
-        *Entry.node(entry1) == *Entry.node(entry2)
+        nodeEqFunc(*Entry.node(entry1), *Entry.node(entry2))
     });
 
     @QueueEntry.entry = [queueEntry]{ queueEntry + 0 };
