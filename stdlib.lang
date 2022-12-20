@@ -416,6 +416,7 @@
 
 @bitAnd = [a, b]{ _bitAnd(a, b) };
 @bitOr = [a, b]{ _bitNot(_bitAnd(_bitNot(a), _bitNot(b))) };
+@bitXor = [a, b]{ _bitXor(a, b) };
 @bitNot = [val]{ _bitNot(val) };
 
 @shiftLeft = [a, b]{
@@ -859,6 +860,13 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
         })
     })
 };
+@pushHeap = [data, size, itemSize, cmp]{
+    @i = size;
+    while({ i > 0 && cmp(data + itemSize * ((i - 1) / 2), data + itemSize * i) }, {
+        swapMem(data + itemSize * i, data + itemSize * ((i - 1) / 2), itemSize);
+        i = (i - 1) / 2
+    })
+};
 @popHeap = [data, size, itemSize, cmp]{
     size = size - 1;
     swapMem(data + itemSize * 0, data + itemSize * size, itemSize);
@@ -958,6 +966,204 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
 
 @Vector.sort = [vector, cmp]{
     sort(Vector.data(vector), Vector.size(vector), *Vector_itemSize(vector), cmp)
+};
+
+//--- HashTable: A fixed-size, insertion-only hash table ---//
+
+// HashTable internals:
+@HashTable_data = [hashtable]{ hashtable + 0 };
+@HashTable_mask = [hashtable]{ hashtable + 4 };
+@HashTable_hashFunc = [hashtable]{ hashtable + 8 };
+@HashTable_eqFunc = [hashtable]{ hashtable + 12 };
+@HashTable_sizeof = 16;
+
+// HashTable public interface:
+@HashTable.reinit = [hashtable, hashFunc, eqFunc]{
+    @size = *HashTable_mask(hashtable) + 1;
+    @data = *HashTable_data(hashtable);
+    forRange(0, size, [i]{
+        *(data + 4 * i) = 0
+    });
+
+    *HashTable_hashFunc(hashtable) = hashFunc;
+    *HashTable_eqFunc(hashtable) = eqFunc
+};
+
+@HashTable.init = [bits, hashFunc, eqFunc]{
+    assert(bits > 0 && bits < 29);
+
+    @hashtable = brk;
+    brk = brk + HashTable_sizeof;
+
+    @size = shiftLeft(1, bits);
+
+    *HashTable_data(hashtable) = brk;
+    brk = brk + 4 * size;
+    *HashTable_mask(hashtable) = size - 1;
+
+    HashTable.reinit(hashtable, hashFunc, eqFunc);
+
+    hashtable
+};
+
+@HashTable.add = [hashtable, item]{
+    assert(item != 0);
+    @mask = *HashTable_mask(hashtable);
+    @i = bitAnd((*HashTable_hashFunc(hashtable))(item), mask);
+    @data = *HashTable_data(hashtable);
+    @eqFunc = *HashTable_eqFunc(hashtable);
+    @j = 0;
+    runWhileTrue({
+        @p = data + 4 * i;
+        ifElse(*p == 0, {
+            *p = item;
+            0
+        }, {
+            assert(!eqFunc(*p, item), "HashTable.add: Item already exists");
+            j = j + 1;
+            @newI = bitAnd(i + j, mask);
+            assert(newI != i, "HashTable.add: Hashtable is full");
+            i = newI;
+            1
+        })
+    })
+};
+
+@HashTable.get = [hashtable, item]{
+    assert(item != 0);
+    @mask = *HashTable_mask(hashtable);
+    @i = bitAnd((*HashTable_hashFunc(hashtable))(item), mask);
+    @data = *HashTable_data(hashtable);
+    @eqFunc = *HashTable_eqFunc(hashtable);
+    @j = 0;
+    @ret = 0;
+    runWhileTrue({
+        @p = data + 4 * i;
+        ifElse0(*p != 0, {
+            ifElse(eqFunc(*p, item), {
+                ret = *p;
+                0
+            }, {
+                j = j + 1;
+                @newI = bitAnd(i + j, mask);
+                @continue = i != newI;
+                i = newI;
+                continue
+            })
+        })
+    });
+    ret
+};
+
+//--- A* algorithm ---//
+
+@aStar = [start, startDist, reuseHashtable, isEndFunc, neighborFunc, heuristicFunc]{
+    @Entry.node = [entry]{ entry + 0 };  // Node is first to allow easy comparison in hashtable.
+    @Entry.dist = [entry]{ entry + 4 };
+    @Entry.heuristic = [entry]{ entry + 8 };
+    @Entry.sizeof = 12;
+    @Entry.init = {
+        @entry = brk;
+        brk = brk + Entry.sizeof;
+        entry
+    };
+
+    @hashtable = reuseHashtable;
+    HashTable.reinit(hashtable, [entry]{
+        @hash = *Entry.node(entry);
+        hash = bitXor(shiftRight(hash, 16), hash) * #45D9F3B;
+        hash = bitXor(shiftRight(hash, 16), hash) * #45D9F3B;
+        hash = bitXor(shiftRight(hash, 16), hash);
+        hash
+    }, [entry1, entry2]{
+        *Entry.node(entry1) == *Entry.node(entry2)
+    });
+
+    @QueueEntry.entry = [queueEntry]{ queueEntry + 0 };
+    @QueueEntry.total = [queueEntry]{ queueEntry + 4 };
+    @QueueEntry.sizeof = 8;
+    @QueueEntry.init = {
+        @entry = brk;
+        brk = brk + QueueEntry.sizeof;
+        entry
+    };
+
+    @queue = Vector.init(4);
+    @queueCmp = [queueEntry1, queueEntry2]{
+        *QueueEntry.total(*queueEntry1) > *QueueEntry.total(*queueEntry2)
+    };
+
+    @startEntry = Entry.init();
+    *Entry.node(startEntry) = start;
+    *Entry.dist(startEntry) = startDist;
+    @startHeuristic = heuristicFunc(start);
+    *Entry.heuristic(startEntry) = startHeuristic;
+    HashTable.add(hashtable, startEntry);
+
+    @startQueueEntry = QueueEntry.init();
+    *QueueEntry.entry(startQueueEntry) = startEntry;
+    *QueueEntry.total(startQueueEntry) = startDist + startHeuristic;
+    *Vector.push(queue) = startQueueEntry;
+
+    @ret = 0;
+    runWhileTrue({
+        //printL("POP FROM QUEUE OF SIZE %u", Vector.size(queue));
+        forRange(0, Vector.size(queue), [i]{
+            @queueEntry = *Vector.item(queue, i);
+            @entry = *QueueEntry.entry(queueEntry);
+            @node = *Entry.node(entry);
+            @total = *QueueEntry.total(queueEntry);
+            @dist = *Entry.dist(entry);
+            @heuristic = *Entry.heuristic(entry);
+            //printL("  - %s%u (total %u, dist %u, heuristic %u)", ifElse(total < dist + heuristic, { "STALE " }, { "" }), node, total, dist, heuristic);
+            assert(total >= dist + heuristic)
+        });
+        assert(Vector.size(queue) != 0, "aStar: No route found");
+        popHeap(Vector.data(queue), Vector.size(queue), 4, queueCmp);
+        @queueEntry = *Vector.pop(queue);
+        @entry = *QueueEntry.entry(queueEntry);
+        ifElse1(*Entry.dist(entry) + *Entry.heuristic(entry) == *QueueEntry.total(queueEntry), {
+            @node = *Entry.node(entry);
+            //printL("POPPED NODE %u (dist = %u, heuristic = %u)", node, *Entry.dist(entry), *Entry.heuristic(entry));
+            ifElse(isEndFunc(node), {
+                ret = *Entry.dist(entry);
+                0
+            }, {
+                @dist = *Entry.dist(entry);
+                neighborFunc(node, [neighborNode, neighborDist]{
+                    //printL("NEIGHBOR NODE %u WITH DIST %u", neighborNode, neighborDist);
+                    @neighborEntry = HashTable.get(hashtable, &neighborNode);
+                    @newDist = dist + neighborDist;
+                    @addToQueue = ifElse(neighborEntry == 0, {
+                        //printL("CREATING ENTRY");
+                        neighborEntry = Entry.init();
+                        *Entry.node(neighborEntry) = neighborNode;
+                        *Entry.dist(neighborEntry) = newDist;
+                        *Entry.heuristic(neighborEntry) = heuristicFunc(neighborNode);
+                        HashTable.add(hashtable, neighborEntry);
+                        1
+                    }, {
+                        //printL("ENTRY ALREADY EXISTS");
+                        ifElse0(newDist < *Entry.dist(neighborEntry), {
+                            //printL("DIST IMPROVED");
+                            *Entry.dist(neighborEntry) = newDist;
+                            1
+                        })
+                    });
+                    assert(*Entry.heuristic(entry) <= neighborDist + *Entry.heuristic(neighborEntry), "Heuristic is not consistent; %u <= %u + %u does not hold", *Entry.heuristic(entry), neighborDist, *Entry.heuristic(neighborEntry));
+                    if(addToQueue, {
+                        @neighborQueueEntry = QueueEntry.init();
+                        *QueueEntry.entry(neighborQueueEntry) = neighborEntry;
+                        *QueueEntry.total(neighborQueueEntry) = *Entry.heuristic(neighborEntry) + newDist;
+                        *Vector.push(queue) = neighborQueueEntry;
+                        pushHeap(Vector.data(queue), Vector.size(queue) - 1, 4, queueCmp)
+                    })
+                });
+                1
+            })
+        })
+    });
+    ret
 };
 
 //--- Int: Arbitrary-size unsigned integer ---//

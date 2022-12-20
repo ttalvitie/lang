@@ -82,7 +82,8 @@ while({ queuePos != Vector.size(queue) }, {
     consider(0, 0 - 1)
 });
 
-printL("%u", *pDist(sx, sy));
+@ret1 = *pDist(sx, sy);
+printL("%u", ret1);
 
 @ret2 = 0 - 1;
 forRange(0, h, [y]{
@@ -93,5 +94,47 @@ forRange(0, h, [y]{
     })
 });
 printL("%u", ret2);
+
+@altRet1 = aStar(ey * w + ex, 0, HashTable.init(16, { 0 }, { 0 }), [pos]{
+    pos == sy * w + sx
+}, [pos, callback]{
+    @x = pos % w;
+    @y = pos / w;
+    @consider = [dx, dy]{
+        @x2 = x + dx;
+        @y2 = y + dy;
+        if(x2 < w && y2 < h && height(x2, y2) + 1 >= height(x, y), {
+            callback(y2 * w + x2, 1)
+        })
+    };
+    consider(1, 0);
+    consider(0 - 1, 0);
+    consider(0, 1);
+    consider(0, 0 - 1)
+}, [pos]{
+    max(height(pos % w, pos / w), absDiff(pos % w, sx) + absDiff(pos / w, sy))
+});
+assert(altRet1 == ret1);
+
+@altRet2 = aStar(ey * w + ex, 0, HashTable.init(16, { 0 }, { 0 }), [pos]{
+    height(pos % w, pos / w) == 0
+}, [pos, callback]{
+    @x = pos % w;
+    @y = pos / w;
+    @consider = [dx, dy]{
+        @x2 = x + dx;
+        @y2 = y + dy;
+        if(x2 < w && y2 < h && height(x2, y2) + 1 >= height(x, y), {
+            callback(y2 * w + x2, 1)
+        })
+    };
+    consider(1, 0);
+    consider(0 - 1, 0);
+    consider(0, 1);
+    consider(0, 0 - 1)
+}, [pos]{
+    height(pos % w, pos / w)
+});
+assert(altRet2 == ret2);
 
 0
