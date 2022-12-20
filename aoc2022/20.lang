@@ -1,7 +1,8 @@
 @Number.val = [number]{ number };
-@Number.prev = [number]{ number + 4 };
-@Number.next = [number]{ number + 8 };
-@Number.sizeof = 12;
+@Number.movement = [number]{ number + 4 };
+@Number.prev = [number]{ number + 8 };
+@Number.next = [number]{ number + 12 };
+@Number.sizeof = 16;
 
 @numbers = Vector.init(Number.sizeof);
 
@@ -20,66 +21,92 @@ runWhileTrue({
 });
 
 @n = Vector.size(numbers) - 1;
-@head = Vector.item(numbers, 0);
 
-@prev = Vector.item(numbers, n);
-forRange(0, n + 1, [i]{
-    @p = Vector.item(numbers, i);
-    *Number.prev(p) = prev;
-    prev = p
-});
-@next = head;
-forRevRange(0, n + 1, [i]{
-    @p = Vector.item(numbers, i);
-    *Number.next(p) = next;
-    next = p
-});
-
-Vector.forEach(numbers, [number]{
-    @val = *Number.val(number);
-    @steps = 0;
-    ifElse(val >= #80000000, {
-        steps = (0 - (0 - val) % n) + n
-    }, {
-        steps = val % n
+@solve = [key, roundCount]{
+    Vector.forEach(numbers, [number]{
+        @val = *Number.val(number);
+        @neg = 0;
+        if(val >= #80000000, {
+            val = 0 - val;
+            neg = 1
+        });
+        *Number.movement(number) = Int.get(Int.rem(Int.mul(Int.init(val), key), Int.init(n)));
+        if(neg, {
+            *Number.movement(number) = 0 - *Number.movement(number)
+        })
     });
 
-    @pos = *Number.next(number);
-    if(head == number, {
-        head = pos
+    @head = Vector.item(numbers, 0);
+
+    @prev = Vector.item(numbers, n);
+    forRange(0, n + 1, [i]{
+        @p = Vector.item(numbers, i);
+        *Number.prev(p) = prev;
+        prev = p
+    });
+    @next = head;
+    forRevRange(0, n + 1, [i]{
+        @p = Vector.item(numbers, i);
+        *Number.next(p) = next;
+        next = p
     });
 
-    prev = *Number.prev(number);
-    *Number.next(prev) = pos;
-    *Number.prev(pos) = prev;
+    forRange(0, roundCount, [roundIdx]{
+        Vector.forEach(numbers, [number]{
+            @val = *Number.movement(number);
+            @steps = 0;
+            ifElse(val >= #80000000, {
+                steps = (0 - (0 - val) % n) + n
+            }, {
+                steps = val % n
+            });
 
-    forRange(0, steps, [i]{
-        pos = *Number.next(pos)
+            @pos = *Number.next(number);
+            if(head == number, {
+                head = pos
+            });
+
+            prev = *Number.prev(number);
+            *Number.next(prev) = pos;
+            *Number.prev(pos) = prev;
+
+            forRange(0, steps, [i]{
+                pos = *Number.next(pos)
+            });
+
+            prev = *Number.prev(pos);
+            *Number.next(prev) = number;
+            *Number.prev(pos) = number;
+            *Number.prev(number) = prev;
+            *Number.next(number) = pos
+        })
     });
 
-    prev = *Number.prev(pos);
-    *Number.next(prev) = number;
-    *Number.prev(pos) = number;
-    *Number.prev(number) = prev;
-    *Number.next(number) = pos
-});
-
-@pos = 0;
-Vector.forEach(numbers, [number]{
-    if(*Number.val(number) == 0, {
-        pos = number
-    })
-});
-assert(pos != 0);
-
-@ret = 0;
-forRange(0, 3, [i]{
-    forRange(0, 1000, [j]{
-        pos = *Number.next(pos)
+    @pos = 0;
+    Vector.forEach(numbers, [number]{
+        if(*Number.val(number) == 0, {
+            pos = number
+        })
     });
-    ret = ret + *Number.val(pos)
-});
+    assert(pos != 0);
 
-printL("%u", ret);
+    @huge = Int.fromDec("1000000000000000000000000000000000");
+    @ret = huge;
+    forRange(0, 3, [i]{
+        forRange(0, 1000, [j]{
+            pos = *Number.next(pos)
+        });
+        @val = *Number.val(pos);
+        ifElse(val >= #80000000, {
+            ret = Int.sub(ret, Int.init(0 - val))
+        }, {
+            ret = Int.add(ret, Int.init(val))
+        })
+    });
+
+    printL("%s", Int.toDec(Int.mul(Int.sub(ret, huge), key)))
+};
+solve(Int.init(1), 1);
+solve(Int.init(811589153), 10);
 
 0
