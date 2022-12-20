@@ -1065,7 +1065,7 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
 
 //--- A* algorithm ---//
 
-@aStar = [start, startDist, reuseHashtable, isEndFunc, neighborFunc, heuristicFunc, nodeHashFunc, nodeEqFunc]{
+@aStar = [start, reuseHashtable, isEndFunc, neighborFunc, heuristicFunc, nodeHashFunc, nodeEqFunc]{
     @Entry.node = [entry]{ entry + 0 };  // Node is first to allow easy comparison in hashtable.
     @Entry.dist = [entry]{ entry + 4 };
     @Entry.heuristic = [entry]{ entry + 8 };
@@ -1094,14 +1094,14 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
 
     @startEntry = Entry.init();
     *Entry.node(startEntry) = start;
-    *Entry.dist(startEntry) = startDist;
+    *Entry.dist(startEntry) = 0;
     @startHeuristic = heuristicFunc(start);
     *Entry.heuristic(startEntry) = startHeuristic;
     HashTable.add(hashtable, startEntry);
 
     @startQueueEntry = Vector.push(queue);
     *QueueEntry.entry(startQueueEntry) = startEntry;
-    *QueueEntry.total(startQueueEntry) = startDist + startHeuristic;
+    *QueueEntry.total(startQueueEntry) = startHeuristic;
 
     @ret = 0;
     runWhileTrue({

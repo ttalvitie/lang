@@ -1,12 +1,31 @@
 @processBlueprint = [blueprintId, orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot]{
-    printL("blueprintId: %u", blueprintId);
-    printL("orePerOreRobot: %u", orePerOreRobot);
-    printL("orePerClayRobot: %u", orePerClayRobot);
-    printL("orePerObsidianRobot: %u", orePerObsidianRobot);
-    printL("clayPerObsidianRobot: %u", clayPerObsidianRobot);
-    printL("orePerGeodeRobot: %u", orePerGeodeRobot);
-    printL("obsidianPerGeodeRobot: %u", obsidianPerGeodeRobot);
-    printL()
+    @State.ore = [state]{ state };
+    @State.clay = [state]{ state + 4 };
+    @State.obsidian = [state]{ state + 8 };
+    @State.oreRobots = [state]{ state + 12 };
+    @State.clayRobots = [state]{ state + 16 };
+    @State.obsidianRobots = [state]{ state + 20 };
+    @State.geodeRobots = [state]{ state + 24 };
+    @State.time = [state]{ state + 28 };
+    @State.sizeof = 32;
+    @State.init = {
+        @ret = brk;
+        brk = brk + State.sizeof,
+        ret
+    };
+
+    @initState = State.init();
+    @State.ore(initState) = 0;
+    @State.clay(initState) = 0;
+    @State.obsidian(initState) = 0;
+    @State.oreRobots(initState) = 1;
+    @State.clayRobots(initState) = 0;
+    @State.obsidianRobots(initState) = 0;
+    @State.geodeRobots(initState) = 0;
+    @State.time(initState) = 0;
+
+//    aStar(initState, reuseHashtable, isEndFunc, neighborFunc, heuristicFunc, nodeHashFunc, nodeEqFunc]
+    0
 };
 
 runWhileTrue({

@@ -95,7 +95,7 @@ forRange(0, h, [y]{
 });
 printL("%u", ret2);
 
-@altRet1 = aStar(ey * w + ex, 0, HashTable.init(16, { 0 }, { 0 }), [pos]{
+@altRet1 = aStar(ey * w + ex, HashTable.init(16, { 0 }, { 0 }), [pos]{
     pos == sy * w + sx
 }, [pos, callback]{
     @x = pos % w;
@@ -120,7 +120,7 @@ printL("%u", ret2);
 });
 assert(altRet1 == ret1);
 
-@altRet2 = aStar(ey * w + ex, 0, HashTable.init(16, { 0 }, { 0 }), [pos]{
+@altRet2 = aStar(ey * w + ex, HashTable.init(16, { 0 }, { 0 }), [pos]{
     height(pos % w, pos / w) == 0
 }, [pos, callback]{
     @x = pos % w;
