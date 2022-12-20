@@ -1082,15 +1082,10 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     @QueueEntry.entry = [queueEntry]{ queueEntry + 0 };
     @QueueEntry.total = [queueEntry]{ queueEntry + 4 };
     @QueueEntry.sizeof = 8;
-    @QueueEntry.init = {
-        @entry = brk;
-        brk = brk + QueueEntry.sizeof;
-        entry
-    };
 
-    @queue = Vector.init(4);
+    @queue = Vector.init(QueueEntry.sizeof);
     @queueCmp = [queueEntry1, queueEntry2]{
-        *QueueEntry.total(*queueEntry1) > *QueueEntry.total(*queueEntry2)
+        *QueueEntry.total(queueEntry1) > *QueueEntry.total(queueEntry2)
     };
 
     @startEntry = Entry.init();
@@ -1100,42 +1095,27 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     *Entry.heuristic(startEntry) = startHeuristic;
     HashTable.add(hashtable, startEntry);
 
-    @startQueueEntry = QueueEntry.init();
+    @startQueueEntry = Vector.push(queue);
     *QueueEntry.entry(startQueueEntry) = startEntry;
     *QueueEntry.total(startQueueEntry) = startDist + startHeuristic;
-    *Vector.push(queue) = startQueueEntry;
 
     @ret = 0;
     runWhileTrue({
-        //printL("POP FROM QUEUE OF SIZE %u", Vector.size(queue));
-        forRange(0, Vector.size(queue), [i]{
-            @queueEntry = *Vector.item(queue, i);
-            @entry = *QueueEntry.entry(queueEntry);
-            @node = *Entry.node(entry);
-            @total = *QueueEntry.total(queueEntry);
-            @dist = *Entry.dist(entry);
-            @heuristic = *Entry.heuristic(entry);
-            //printL("  - %s%u (total %u, dist %u, heuristic %u)", ifElse(total < dist + heuristic, { "STALE " }, { "" }), node, total, dist, heuristic);
-            assert(total >= dist + heuristic)
-        });
         assert(Vector.size(queue) != 0, "aStar: No route found");
-        popHeap(Vector.data(queue), Vector.size(queue), 4, queueCmp);
-        @queueEntry = *Vector.pop(queue);
+        popHeap(Vector.data(queue), Vector.size(queue), QueueEntry.sizeof, queueCmp);
+        @queueEntry = Vector.pop(queue);
         @entry = *QueueEntry.entry(queueEntry);
         ifElse1(*Entry.dist(entry) + *Entry.heuristic(entry) == *QueueEntry.total(queueEntry), {
             @node = *Entry.node(entry);
-            //printL("POPPED NODE %u (dist = %u, heuristic = %u)", node, *Entry.dist(entry), *Entry.heuristic(entry));
             ifElse(isEndFunc(node), {
                 ret = *Entry.dist(entry);
                 0
             }, {
                 @dist = *Entry.dist(entry);
                 neighborFunc(node, [neighborNode, neighborDist]{
-                    //printL("NEIGHBOR NODE %u WITH DIST %u", neighborNode, neighborDist);
                     @neighborEntry = HashTable.get(hashtable, &neighborNode);
                     @newDist = dist + neighborDist;
                     @addToQueue = ifElse(neighborEntry == 0, {
-                        //printL("CREATING ENTRY");
                         neighborEntry = Entry.init();
                         *Entry.node(neighborEntry) = neighborNode;
                         *Entry.dist(neighborEntry) = newDist;
@@ -1143,20 +1123,17 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
                         HashTable.add(hashtable, neighborEntry);
                         1
                     }, {
-                        //printL("ENTRY ALREADY EXISTS");
                         ifElse0(newDist < *Entry.dist(neighborEntry), {
-                            //printL("DIST IMPROVED");
                             *Entry.dist(neighborEntry) = newDist;
                             1
                         })
                     });
                     assert(*Entry.heuristic(entry) <= neighborDist + *Entry.heuristic(neighborEntry), "Heuristic is not consistent; %u <= %u + %u does not hold", *Entry.heuristic(entry), neighborDist, *Entry.heuristic(neighborEntry));
                     if(addToQueue, {
-                        @neighborQueueEntry = QueueEntry.init();
+                        @neighborQueueEntry = Vector.push(queue);
                         *QueueEntry.entry(neighborQueueEntry) = neighborEntry;
                         *QueueEntry.total(neighborQueueEntry) = *Entry.heuristic(neighborEntry) + newDist;
-                        *Vector.push(queue) = neighborQueueEntry;
-                        pushHeap(Vector.data(queue), Vector.size(queue) - 1, 4, queueCmp)
+                        pushHeap(Vector.data(queue), Vector.size(queue) - 1, QueueEntry.sizeof, queueCmp)
                     })
                 });
                 1
