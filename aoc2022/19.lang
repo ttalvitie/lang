@@ -1,0 +1,31 @@
+@processBlueprint = [blueprintId, orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot]{
+    printL("blueprintId: %u", blueprintId);
+    printL("orePerOreRobot: %u", orePerOreRobot);
+    printL("orePerClayRobot: %u", orePerClayRobot);
+    printL("orePerObsidianRobot: %u", orePerObsidianRobot);
+    printL("clayPerObsidianRobot: %u", clayPerObsidianRobot);
+    printL("orePerGeodeRobot: %u", orePerGeodeRobot);
+    printL("obsidianPerGeodeRobot: %u", obsidianPerGeodeRobot);
+    printL()
+};
+
+runWhileTrue({
+    @line = inputLine();
+    ifElse0(get8(line), {
+        @blueprintId = 0;
+        @orePerOreRobot = 0;
+        @orePerClayRobot = 0;
+        @orePerObsidianRobot = 0;
+        @clayPerObsidianRobot = 0;
+        @orePerGeodeRobot = 0;
+        @obsidianPerGeodeRobot = 0;
+
+        parseStr(line, "Blueprint %u: Each ore robot costs %u ore. Each clay robot costs %u ore. Each obsidian robot costs %u ore and %u clay. Each geode robot costs %u ore and %u obsidian.", &blueprintId, &orePerOreRobot, &orePerClayRobot, &orePerObsidianRobot, &clayPerObsidianRobot, &orePerGeodeRobot, &obsidianPerGeodeRobot);
+
+        processBlueprint(blueprintId, orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot);
+
+        1
+    })
+});
+
+0
