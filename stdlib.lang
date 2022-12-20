@@ -1063,6 +1063,11 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     hash
 };
 
+// Combine two hashes.
+@combineHash = [hash1, hash2]{
+    bitXor(hash1, hash2 + #9E3779B9 + shiftLeft(hash1, 6) + shiftRight(hash1, 2))
+};
+
 //--- A* algorithm ---//
 
 @aStar = [start, reuseHashtable, isEndFunc, neighborFunc, heuristicFunc, nodeHashFunc, nodeEqFunc]{

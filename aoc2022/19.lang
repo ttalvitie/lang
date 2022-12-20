@@ -1,4 +1,7 @@
-@processBlueprint = [blueprintId, orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot]{
+@roundCount = 24;
+@hashtable = HashTable.init(22, { 0 }, { 0 });
+
+@processBlueprint = [orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot]{
     @State.ore = [state]{ state };
     @State.clay = [state]{ state + 4 };
     @State.obsidian = [state]{ state + 8 };
@@ -6,27 +9,125 @@
     @State.clayRobots = [state]{ state + 16 };
     @State.obsidianRobots = [state]{ state + 20 };
     @State.geodeRobots = [state]{ state + 24 };
-    @State.time = [state]{ state + 28 };
+    @State.roundsDone = [state]{ state + 28 };
     @State.sizeof = 32;
     @State.init = {
         @ret = brk;
-        brk = brk + State.sizeof,
+        brk = brk + State.sizeof;
         ret
     };
 
     @initState = State.init();
-    @State.ore(initState) = 0;
-    @State.clay(initState) = 0;
-    @State.obsidian(initState) = 0;
-    @State.oreRobots(initState) = 1;
-    @State.clayRobots(initState) = 0;
-    @State.obsidianRobots(initState) = 0;
-    @State.geodeRobots(initState) = 0;
-    @State.time(initState) = 0;
+    *State.ore(initState) = 0;
+    *State.clay(initState) = 0;
+    *State.obsidian(initState) = 0;
+    *State.oreRobots(initState) = 1;
+    *State.clayRobots(initState) = 0;
+    *State.obsidianRobots(initState) = 0;
+    *State.geodeRobots(initState) = 0;
+    *State.roundsDone(initState) = 0;
 
-//    aStar(initState, reuseHashtable, isEndFunc, neighborFunc, heuristicFunc, nodeHashFunc, nodeEqFunc]
-    0
+    @roundDist = shiftLeft(1, 27);
+    assert(roundCount < 32);
+
+    @isEnd = [state]{
+        *State.roundsDone(state) == roundCount
+    };
+    @neighbors = [state, callback]{
+        @stateAfter = State.init();
+        copyMem(state, stateAfter, State.sizeof);
+
+        *State.ore(stateAfter) = *State.ore(stateAfter) + *State.oreRobots(stateAfter);
+        *State.clay(stateAfter) = *State.clay(stateAfter) + *State.clayRobots(stateAfter);
+        *State.obsidian(stateAfter) = *State.obsidian(stateAfter) + *State.obsidianRobots(stateAfter);
+        *State.roundsDone(stateAfter) = *State.roundsDone(stateAfter) + 1;
+
+        @dist = roundDist - *State.geodeRobots(state);
+
+        if(*State.ore(state) >= orePerOreRobot, {
+            @state2 = State.init();
+            copyMem(stateAfter, state2, State.sizeof);
+            *State.ore(state2) = *State.ore(state2) - orePerOreRobot;
+            *State.oreRobots(state2) = *State.oreRobots(state2) + 1;
+            callback(state2, dist)
+        });
+
+        if(*State.ore(state) >= orePerClayRobot, {
+            @state2 = State.init();
+            copyMem(stateAfter, state2, State.sizeof);
+            *State.ore(state2) = *State.ore(state2) - orePerClayRobot;
+            *State.clayRobots(state2) = *State.clayRobots(state2) + 1;
+            callback(state2, dist)
+        });
+
+        if(*State.ore(state) >= orePerObsidianRobot && *State.clay(state) >= clayPerObsidianRobot, {
+            @state2 = State.init();
+            copyMem(stateAfter, state2, State.sizeof);
+            *State.ore(state2) = *State.ore(state2) - orePerObsidianRobot;
+            *State.clay(state2) = *State.clay(state2) - clayPerObsidianRobot;
+            *State.obsidianRobots(state2) = *State.obsidianRobots(state2) + 1;
+            callback(state2, dist)
+        });
+
+        if(*State.ore(state) >= orePerGeodeRobot && *State.obsidian(state) >= obsidianPerGeodeRobot, {
+            @state2 = State.init();
+            copyMem(stateAfter, state2, State.sizeof);
+            *State.ore(state2) = *State.ore(state2) - orePerGeodeRobot;
+            *State.obsidian(state2) = *State.obsidian(state2) - obsidianPerGeodeRobot;
+            *State.geodeRobots(state2) = *State.geodeRobots(state2) + 1;
+            callback(state2, dist)
+        });
+
+        callback(stateAfter, dist)
+    };
+    @heuristic = [state]{
+        @ret = 0;
+
+        @ore = *State.ore(state);
+        @clay = *State.clay(state);
+        @obsidian = *State.obsidian(state);
+        @oreRobots = *State.oreRobots(state);
+        @clayRobots = *State.clayRobots(state);
+        @obsidianRobots = *State.obsidianRobots(state);
+        @geodeRobots = *State.geodeRobots(state);
+        @origOreRobots = oreRobots;
+        @origClayRobots = clayRobots;
+        @origObsidianRobots = obsidianRobots;
+        @origGeodeRobots = geodeRobots;
+
+        forRange(*State.roundsDone(state), roundCount, [i]{
+            @buyOreRobot = ore >= (oreRobots - origOreRobots + 1) * orePerOreRobot;
+            @buyClayRobot = ore >= (clayRobots - origClayRobots + 1) * orePerClayRobot;
+            @buyObsidianRobot = ore >= (obsidianRobots - origObsidianRobots + 1) * orePerObsidianRobot && clay >= (obsidianRobots - origObsidianRobots + 1) * clayPerObsidianRobot;
+            @buyGeodeRobot = ore >= (geodeRobots - origGeodeRobots + 1) * orePerGeodeRobot && obsidian >= (geodeRobots - origGeodeRobots + 1) * obsidianPerGeodeRobot;
+
+            ore = ore + oreRobots;
+            clay = clay + clayRobots;
+            obsidian = obsidian + obsidianRobots;
+            ret = ret + roundDist - geodeRobots;
+
+            oreRobots = oreRobots + buyOreRobot;
+            clayRobots = clayRobots + buyClayRobot;
+            obsidianRobots = obsidianRobots + buyObsidianRobot;
+            geodeRobots = geodeRobots + buyGeodeRobot
+        });
+        ret
+    };
+    @nodeHash = [state]{
+        @hash = 0;
+        forRange(0, 8, [i]{
+            hash = combineHash(hash, hashU32(*(state + 4 * i)))
+        });
+        hash
+    };
+    @nodeEq = [state1, state2]{
+        memEqual(state1, state2, State.sizeof)
+    };
+
+    roundCount * roundDist - aStar(initState, hashtable, isEnd, neighbors, heuristic, nodeHash, nodeEq)
 };
+
+@ret1 = 0;
 
 runWhileTrue({
     @line = inputLine();
@@ -41,10 +142,13 @@ runWhileTrue({
 
         parseStr(line, "Blueprint %u: Each ore robot costs %u ore. Each clay robot costs %u ore. Each obsidian robot costs %u ore and %u clay. Each geode robot costs %u ore and %u obsidian.", &blueprintId, &orePerOreRobot, &orePerClayRobot, &orePerObsidianRobot, &clayPerObsidianRobot, &orePerGeodeRobot, &obsidianPerGeodeRobot);
 
-        processBlueprint(blueprintId, orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot);
+        @geodes = processBlueprint(orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot);
+        ret1 = ret1 + blueprintId * geodes;
 
         1
     })
 });
+
+printL("%u", ret1);
 
 0
