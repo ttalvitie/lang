@@ -1,7 +1,6 @@
-@roundCount = 24;
 @hashtable = HashTable.init(22, { 0 }, { 0 });
 
-@processBlueprint = [orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot]{
+@processBlueprint = [roundCount, orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot]{
     @State.ore = [state]{ state };
     @State.clay = [state]{ state + 4 };
     @State.obsidian = [state]{ state + 8 };
@@ -138,6 +137,7 @@
 };
 
 @ret1 = 0;
+@ret2 = 1;
 
 runWhileTrue({
     @line = inputLine();
@@ -152,13 +152,19 @@ runWhileTrue({
 
         parseStr(line, "Blueprint %u: Each ore robot costs %u ore. Each clay robot costs %u ore. Each obsidian robot costs %u ore and %u clay. Each geode robot costs %u ore and %u obsidian.", &blueprintId, &orePerOreRobot, &orePerClayRobot, &orePerObsidianRobot, &clayPerObsidianRobot, &orePerGeodeRobot, &obsidianPerGeodeRobot);
 
-        @geodes = processBlueprint(orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot);
+        @geodes = processBlueprint(24, orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot);
         ret1 = ret1 + blueprintId * geodes;
+
+        if(blueprintId <= 3, {
+            @geodes2 = processBlueprint(32, orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot);
+            ret2 = ret2 * geodes2
+        });
 
         1
     })
 });
 
 printL("%u", ret1);
+printL("%u", ret2);
 
 0
