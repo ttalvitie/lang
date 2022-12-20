@@ -1,4 +1,4 @@
-@hashtable = HashTable.init(22, { 0 }, { 0 });
+@hashtable = HashTable.init(17, { 0 }, { 0 });
 
 @processBlueprint = [roundCount, orePerOreRobot, orePerClayRobot, orePerObsidianRobot, clayPerObsidianRobot, orePerGeodeRobot, obsidianPerGeodeRobot]{
     @State.ore = [state]{ state };
