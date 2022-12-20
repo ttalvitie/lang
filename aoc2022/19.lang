@@ -27,14 +27,18 @@
     *State.geodeRobots(initState) = 0;
     *State.roundsDone(initState) = 0;
 
-    @roundDist = shiftLeft(1, 27);
-    assert(roundCount < 32);
+    @roundDist = shiftLeft(1, 26);
+    assert(roundCount < 64);
 
     @isEnd = [state]{
         *State.roundsDone(state) == roundCount
     };
+
+    // Temporary states used in neighbors.
+    @stateAfter = State.init();
+    @stateTmp = State.init();
+
     @neighbors = [state, callback]{
-        @stateAfter = State.init();
         copyMem(state, stateAfter, State.sizeof);
 
         *State.ore(stateAfter) = *State.ore(stateAfter) + *State.oreRobots(stateAfter);
@@ -45,40 +49,46 @@
         @dist = roundDist - *State.geodeRobots(state);
 
         if(*State.ore(state) >= orePerOreRobot, {
-            @state2 = State.init();
-            copyMem(stateAfter, state2, State.sizeof);
-            *State.ore(state2) = *State.ore(state2) - orePerOreRobot;
-            *State.oreRobots(state2) = *State.oreRobots(state2) + 1;
-            callback(state2, dist)
+            copyMem(stateAfter, stateTmp, State.sizeof);
+            *State.ore(stateTmp) = *State.ore(stateTmp) - orePerOreRobot;
+            *State.oreRobots(stateTmp) = *State.oreRobots(stateTmp) + 1;
+            if(callback(stateTmp, dist), {
+                stateTmp = State.init()
+            })
         });
 
         if(*State.ore(state) >= orePerClayRobot, {
-            @state2 = State.init();
-            copyMem(stateAfter, state2, State.sizeof);
-            *State.ore(state2) = *State.ore(state2) - orePerClayRobot;
-            *State.clayRobots(state2) = *State.clayRobots(state2) + 1;
-            callback(state2, dist)
+            copyMem(stateAfter, stateTmp, State.sizeof);
+            *State.ore(stateTmp) = *State.ore(stateTmp) - orePerClayRobot;
+            *State.clayRobots(stateTmp) = *State.clayRobots(stateTmp) + 1;
+            if(callback(stateTmp, dist), {
+                stateTmp = State.init()
+            })
         });
 
         if(*State.ore(state) >= orePerObsidianRobot && *State.clay(state) >= clayPerObsidianRobot, {
-            @state2 = State.init();
-            copyMem(stateAfter, state2, State.sizeof);
-            *State.ore(state2) = *State.ore(state2) - orePerObsidianRobot;
-            *State.clay(state2) = *State.clay(state2) - clayPerObsidianRobot;
-            *State.obsidianRobots(state2) = *State.obsidianRobots(state2) + 1;
-            callback(state2, dist)
+            copyMem(stateAfter, stateTmp, State.sizeof);
+            *State.ore(stateTmp) = *State.ore(stateTmp) - orePerObsidianRobot;
+            *State.clay(stateTmp) = *State.clay(stateTmp) - clayPerObsidianRobot;
+            *State.obsidianRobots(stateTmp) = *State.obsidianRobots(stateTmp) + 1;
+            if(callback(stateTmp, dist), {
+                stateTmp = State.init()
+            })
         });
 
         if(*State.ore(state) >= orePerGeodeRobot && *State.obsidian(state) >= obsidianPerGeodeRobot, {
-            @state2 = State.init();
-            copyMem(stateAfter, state2, State.sizeof);
-            *State.ore(state2) = *State.ore(state2) - orePerGeodeRobot;
-            *State.obsidian(state2) = *State.obsidian(state2) - obsidianPerGeodeRobot;
-            *State.geodeRobots(state2) = *State.geodeRobots(state2) + 1;
-            callback(state2, dist)
+            copyMem(stateAfter, stateTmp, State.sizeof);
+            *State.ore(stateTmp) = *State.ore(stateTmp) - orePerGeodeRobot;
+            *State.obsidian(stateTmp) = *State.obsidian(stateTmp) - obsidianPerGeodeRobot;
+            *State.geodeRobots(stateTmp) = *State.geodeRobots(stateTmp) + 1;
+            if(callback(stateTmp, dist), {
+                stateTmp = State.init()
+            })
         });
 
-        callback(stateAfter, dist)
+        if(callback(stateAfter, dist), {
+            stateAfter = State.init()
+        })
     };
     @heuristic = [state]{
         @ret = 0;
