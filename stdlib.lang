@@ -1491,6 +1491,94 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     ret
 };
 
+//--- Rational: Arbitrary-size signed rational number (ratio of two SInts) ---//
+
+@Rational.fromSIntDiv = [a, b]{
+    assert(SInt.neq(b, SInt.0), "Rational.fromSIntDiv: division by zero");
+
+    @gcd = [x, y]{
+        ifElse(SInt.eq(y, SInt.0), {
+            x
+        }, {
+            gcd(y, SInt.rem(x, y))
+        })
+    };
+    @d = gcd(a, b);
+    a = SInt.div(a, d);
+    b = SInt.div(b, d);
+
+    if(SInt.lt(b, SInt.0), {
+        a = SInt.neg(a);
+        b = SInt.neg(b)
+    });
+
+    @rat = brk;
+    brk = brk + 8;
+
+    *rat = a;
+    *(rat + 4) = b;
+
+    rat
+};
+@Rational.init = [a, b]{
+    Rational.fromSIntDiv(SInt.init(a), SInt.init(b))
+};
+
+@Rational.0 = Rational.init(0, 1);
+@Rational.1 = Rational.init(1, 1);
+
+@Rational.numerator = [rat]{
+    *rat
+};
+@Rational.denominator = [rat]{
+    *(rat + 4)
+};
+
+@Rational.add = [a, b]{
+    @a1 = Rational.numerator(a);
+    @a2 = Rational.denominator(a);
+    @b1 = Rational.numerator(b);
+    @b2 = Rational.denominator(b);
+    Rational.fromSIntDiv(SInt.add(SInt.mul(a1, b2), SInt.mul(a2, b1)), SInt.mul(a2, b2))
+};
+@Rational.sub = [a, b]{
+    @a1 = Rational.numerator(a);
+    @a2 = Rational.denominator(a);
+    @b1 = Rational.numerator(b);
+    @b2 = Rational.denominator(b);
+    Rational.fromSIntDiv(SInt.sub(SInt.mul(a1, b2), SInt.mul(a2, b1)), SInt.mul(a2, b2))
+};
+@Rational.mul = [a, b]{
+    @a1 = Rational.numerator(a);
+    @a2 = Rational.denominator(a);
+    @b1 = Rational.numerator(b);
+    @b2 = Rational.denominator(b);
+    Rational.fromSIntDiv(SInt.mul(a1, b1), SInt.mul(a2, b2))
+};
+@Rational.div = [a, b]{
+    @a1 = Rational.numerator(a);
+    @a2 = Rational.denominator(a);
+    @b1 = Rational.numerator(b);
+    @b2 = Rational.denominator(b);
+    Rational.fromSIntDiv(SInt.mul(a1, b2), SInt.mul(a2, b1))
+};
+
+@Rational.neg = [val]{
+    Rational.sub(Rational.0, val)
+};
+
+@Rational.eq = [a, b]{
+    SInt.eq(Rational.numerator(a), Rational.numerator(b)) && SInt.eq(Rational.denominator(a), Rational.denominator(b))
+};
+@Rational.lt = [a, b]{
+    SInt.lt(Rational.numerator(Rational.sub(a, b)), SInt.0)
+};
+
+@Rational.neq = [a, b]{ !Rational.eq(b, a) };
+@Rational.gt = [a, b]{ Rational.lt(b, a) };
+@Rational.leq = [a, b]{ !Rational.gt(a, b) };
+@Rational.geq = [a, b]{ !Rational.lt(a, b) };
+
 //------------------------------------------------------------------------------------------------//
 // PROGRAM                                                                                        //
 //------------------------------------------------------------------------------------------------//

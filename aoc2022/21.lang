@@ -1,9 +1,11 @@
 @Monkey.name = [monkey]{ monkey + 0 };
 @Monkey.val = [monkey]{ monkey + 4 };
-@Monkey.op1 = [monkey]{ monkey + 8 };
-@Monkey.op2 = [monkey]{ monkey + 12 };
-@Monkey.func = [monkey]{ monkey + 16 };
-@Monkey.sizeof = 20;
+@Monkey.deriv = [monkey]{ monkey + 8 };
+@Monkey.op1 = [monkey]{ monkey + 12 };
+@Monkey.op2 = [monkey]{ monkey + 16 };
+@Monkey.func = [monkey]{ monkey + 20 };
+@Monkey.derivFunc = [monkey]{ monkey + 24 };
+@Monkey.sizeof = 28;
 @Monkey.init = {
     @ret = brk;
     brk = brk + Monkey.sizeof;
@@ -30,21 +32,36 @@ runWhileTrue({
 
         ifChain(
             { tryParseStr(line, "%s: %s + %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = SInt.add
+                *Monkey.func(monkey) = Rational.add;
+                *Monkey.derivFunc(monkey) = [x, y, dx, dy]{
+                    Rational.add(dx, dy)
+                }
             },
             { tryParseStr(line, "%s: %s - %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = SInt.sub
+                *Monkey.func(monkey) = Rational.sub;
+                *Monkey.derivFunc(monkey) = [x, y, dx, dy]{
+                    Rational.sub(dx, dy)
+                }
             },
             { tryParseStr(line, "%s: %s * %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = SInt.mul
+                *Monkey.func(monkey) = Rational.mul;
+                *Monkey.derivFunc(monkey) = [x, y, dx, dy]{
+                    assert(Rational.eq(dx, Rational.0) || Rational.eq(dy, Rational.0));
+                    Rational.add(Rational.mul(x, dy), Rational.mul(dx, y))
+                }
             },
             { tryParseStr(line, "%s: %s / %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = SInt.div
+                *Monkey.func(monkey) = Rational.div;
+                *Monkey.derivFunc(monkey) = [x, y, dx, dy]{
+                    assert(Rational.eq(dy, Rational.0));
+                    Rational.div(dx, y)
+                }
             },
             {
                 @valStr = 0;
                 parseStr(line, "%s: %s", Monkey.name(monkey), &valStr);
-                *Monkey.val(monkey) = SInt.fromDec(valStr)
+                *Monkey.val(monkey) = Rational.fromSIntDiv(SInt.fromDec(valStr), SInt.init(1));
+                *Monkey.deriv(monkey) = ifElse(strEqual(*Monkey.name(monkey), "humn"), { Rational.1 }, { Rational.0 })
             }
         );
 
@@ -58,11 +75,33 @@ runWhileTrue({
     @monkey = HashTable.get(hashtable, &name);
     assert(monkey != 0);
     if(*Monkey.val(monkey) == 0, {
-        *Monkey.val(monkey) = (*Monkey.func(monkey))(eval(*Monkey.op1(monkey)), eval(*Monkey.op2(monkey)))
+        @monkey1 = eval(*Monkey.op1(monkey));
+        @monkey2 = eval(*Monkey.op2(monkey));
+        *Monkey.val(monkey) = (*Monkey.func(monkey))(*Monkey.val(monkey1), *Monkey.val(monkey2));
+        *Monkey.deriv(monkey) = (*Monkey.derivFunc(monkey))(*Monkey.val(monkey1), *Monkey.val(monkey2), *Monkey.deriv(monkey1), *Monkey.deriv(monkey2))
     });
-    *Monkey.val(monkey)
+    monkey
 };
 
-printL("%s", SInt.toDec(eval("root")));
+@rootMonkey = eval("root");
+@rootVal = *Monkey.val(rootMonkey);
+assert(SInt.eq(Rational.denominator(rootVal), SInt.1));
+printL("%s", SInt.toDec(Rational.numerator(rootVal)));
+
+@monkey1 = HashTable.get(hashtable, Monkey.op1(rootMonkey));
+@monkey2 = HashTable.get(hashtable, Monkey.op2(rootMonkey));
+assert(monkey1 != 0 && monkey2 != 0);
+@diff = Rational.sub(*Monkey.val(monkey1), *Monkey.val(monkey2));
+@diffDeriv = Rational.sub(*Monkey.deriv(monkey1), *Monkey.deriv(monkey2));
+
+@change = Rational.div(Rational.neg(diff), diffDeriv);
+
+@humnStr = "humn";
+@humnMonkey = HashTable.get(hashtable, &humnStr);
+assert(humnMonkey != 0);
+
+@yell = Rational.add(*Monkey.val(humnMonkey), change);
+assert(SInt.eq(Rational.denominator(yell), SInt.1));
+printL("%s", SInt.toDec(Rational.numerator(yell)));
 
 0
