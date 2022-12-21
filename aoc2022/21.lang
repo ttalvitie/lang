@@ -1,0 +1,68 @@
+@Monkey.name = [monkey]{ monkey + 0 };
+@Monkey.val = [monkey]{ monkey + 4 };
+@Monkey.op1 = [monkey]{ monkey + 8 };
+@Monkey.op2 = [monkey]{ monkey + 12 };
+@Monkey.func = [monkey]{ monkey + 16 };
+@Monkey.sizeof = 20;
+@Monkey.init = {
+    @ret = brk;
+    brk = brk + Monkey.sizeof;
+    ret
+};
+
+@hashtable = HashTable.init(16, [monkey]{
+    @hash = 0;
+    @name = *Monkey.name(monkey);
+    while({ get8(name) }, {
+        hash = combineHash(hash, hashU32(get8(name)));
+        name = name + 1
+    });
+    hash
+}, [monkey1, monkey2]{
+    strEqual(*Monkey.name(monkey1), *Monkey.name(monkey2))
+});
+
+runWhileTrue({
+    @line = inputLine();
+    ifElse0(get8(line), {
+        @monkey = Monkey.init();
+        *Monkey.val(monkey) = 0;
+
+        ifChain(
+            { tryParseStr(line, "%s: %s + %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
+                *Monkey.func(monkey) = [x, y]{ Int.add(x, y) }
+            },
+            { tryParseStr(line, "%s: %s - %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
+                *Monkey.func(monkey) = [x, y]{ Int.sub(x, y) }
+            },
+            { tryParseStr(line, "%s: %s * %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
+                *Monkey.func(monkey) = [x, y]{ Int.mul(x, y) }
+            },
+            { tryParseStr(line, "%s: %s / %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
+                *Monkey.func(monkey) = [x, y]{ Int.div(x, y) }
+            },
+            {
+                @valStr = 0;
+                parseStr(line, "%s: %s", Monkey.name(monkey), &valStr);
+                *Monkey.val(monkey) = Int.fromDec(valStr)
+            }
+        );
+
+        HashTable.add(hashtable, monkey);
+
+        1
+    })
+});
+
+@eval = [name]{
+    @monkey = HashTable.get(hashtable, &name);
+    assert(monkey != 0);
+    if(*Monkey.val(monkey) == 0, {
+        *Monkey.val(monkey) = (*Monkey.func(monkey))(eval(*Monkey.op1(monkey)), eval(*Monkey.op2(monkey)))
+    });
+    *Monkey.val(monkey)
+};
+
+printL("%s", Int.toDec(eval("root")));
+
+0
