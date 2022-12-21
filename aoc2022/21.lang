@@ -30,21 +30,21 @@ runWhileTrue({
 
         ifChain(
             { tryParseStr(line, "%s: %s + %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = Int.add
+                *Monkey.func(monkey) = SInt.add
             },
             { tryParseStr(line, "%s: %s - %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = Int.sub
+                *Monkey.func(monkey) = SInt.sub
             },
             { tryParseStr(line, "%s: %s * %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = Int.mul
+                *Monkey.func(monkey) = SInt.mul
             },
             { tryParseStr(line, "%s: %s / %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = Int.div
+                *Monkey.func(monkey) = SInt.div
             },
             {
                 @valStr = 0;
                 parseStr(line, "%s: %s", Monkey.name(monkey), &valStr);
-                *Monkey.val(monkey) = Int.fromDec(valStr)
+                *Monkey.val(monkey) = SInt.fromDec(valStr)
             }
         );
 
@@ -63,6 +63,6 @@ runWhileTrue({
     *Monkey.val(monkey)
 };
 
-printL("%s", Int.toDec(eval("root")));
+printL("%s", SInt.toDec(eval("root")));
 
 0

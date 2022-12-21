@@ -1170,6 +1170,9 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
     ret
 };
 
+@Int.0 = Int.init(0);
+@Int.1 = Int.init(1);
+
 @Int.eq = [a, b]{
     ifElse0(*a == *b, {
         forRangeWhileTrue(0, *a, [i]{
@@ -1319,6 +1322,170 @@ __builtin_wrongNumberOfArgumentsHandler = [line, column, correctArgCount, givenA
         brk = brk + 1
     };
     recursion(val);
+    put8(brk, 0);
+    brk = brk + 1;
+    ret
+};
+
+//--- SInt: Arbitrary-size signed integer ---//
+
+@SInt.init = [val]{
+    @ret = brk;
+    brk = brk + 8;
+    *ret = 0;
+    *(ret + 4) = Int.init(val);
+    ret
+};
+
+@SInt.0 = SInt.init(0);
+@SInt.1 = SInt.init(1);
+
+@SInt.eq = [a, b]{
+    *a == *b && Int.eq(*(a + 4), *(b + 4))
+};
+@SInt.lt = [a, b]{
+    ifElse(*a, {
+        // a < 0
+        ifElse(*b, {
+            // b < 0
+            Int.lt(*(b + 4), *(a + 4))
+        }, {
+            // b >= 0
+            1
+        })
+    }, {
+        // a >= 0
+        ifElse(*b, {
+            // b < 0
+            0
+        }, {
+            // b >= 0
+            Int.lt(*(a + 4), *(b + 4))
+        })
+    })
+};
+
+@SInt.neq = [a, b]{ !SInt.eq(b, a) };
+@SInt.gt = [a, b]{ SInt.lt(b, a) };
+@SInt.leq = [a, b]{ !SInt.gt(a, b) };
+@SInt.geq = [a, b]{ !SInt.lt(a, b) };
+
+@SInt.neg = [val]{
+    ifElse(SInt.eq(val, SInt.0), {
+        SInt.0
+    }, {
+        @ret = brk;
+        brk = brk + 8;
+        *ret = !*val;
+        *(ret + 4) = *(val + 4);
+        ret
+    })
+};
+
+@SInt.add = [a, b]{
+    @ret = brk;
+    brk = brk + 8;
+    ifElse(*a == *b, {
+        *ret = *a;
+        *(ret + 4) = Int.add(*(a + 4), *(b + 4))
+    }, {
+        ifChain(
+            { Int.eq(*(a + 4), *(b + 4)) }, {
+                *ret = 0;
+                *(ret + 4) = Int.0
+            },
+            { Int.lt(*(a + 4), *(b + 4)) }, {
+                *ret = *b;
+                *(ret + 4) = Int.sub(*(b + 4), *(a + 4))
+            },
+            {
+                *ret = *a;
+                *(ret + 4) = Int.sub(*(a + 4), *(b + 4))
+            }
+        )
+    });
+    ret
+};
+@SInt.sub = [a, b]{
+    SInt.add(a, SInt.neg(b))
+};
+@SInt.mul = [a, b]{
+    ifElse(SInt.eq(a, SInt.0) || SInt.eq(b, SInt.0), {
+        SInt.0
+    }, {
+        @ret = brk;
+        brk = brk + 8;
+        *ret = *a != *b;
+        *(ret + 4) = Int.mul(*(a + 4), *(b + 4));
+        ret
+    })
+};
+@SInt.div = [a, b]{
+    assert(SInt.neq(b, SInt.0), "SInt.div: division by zero");
+    ifElse(SInt.eq(a, SInt.0), {
+        SInt.0
+    }, {
+        @ret = brk;
+        brk = brk + 8;
+        *ret = *a != *b;
+        *(ret + 4) = Int.div(*(a + 4), *(b + 4));
+        ret
+    })
+};
+@SInt.rem = [a, b]{
+    assert(SInt.neq(b, SInt.0), "SInt.rem: division by zero");
+    @val = Int.rem(*(a + 4), *(b + 4));
+    ifElse(Int.eq(val, Int.0), {
+        SInt.0
+    }, {
+        @ret = brk;
+        brk = brk + 8;
+        *ret = *a;
+        *(ret + 4) = val;
+        ret
+    })
+};
+
+@SInt.get = [val]{
+    assert(*val == 0, "SInt.get: value is negative");
+    Int.get(*(val + 4))
+};
+
+@SInt.fromDec = [str]{
+    @ret = brk;
+    brk = brk + 8;
+    @val = 0;
+    ifElse(get8(str) == charNum("-"), {
+        *ret = 1;
+        val = Int.fromDec(str + 1)
+    }, {
+        *ret = 0;
+        val = Int.fromDec(str)
+    });
+    if(Int.eq(val, Int.0), {
+        *ret = 0
+    });
+    *(ret + 4) = val;
+    ret
+};
+@SInt.toDec = [val]{
+    @ret = 0;
+    @recursion = [left]{
+        @digit = charNum("0") + Int.get(Int.rem(left, Int.init(10)));
+        @tail = Int.div(left, Int.init(10));
+        ifElse(Int.eq(tail, Int.init(0)), {
+            ret = brk;
+            if(*val, {
+                put8(brk, charNum("-"));
+                brk = brk + 1
+            })
+        }, {
+            recursion(tail)
+        });
+        put8(brk, digit);
+        brk = brk + 1
+    };
+    recursion(*(val + 4));
     put8(brk, 0);
     brk = brk + 1;
     ret
