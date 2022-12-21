@@ -30,16 +30,16 @@ runWhileTrue({
 
         ifChain(
             { tryParseStr(line, "%s: %s + %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = [x, y]{ Int.add(x, y) }
+                *Monkey.func(monkey) = Int.add
             },
             { tryParseStr(line, "%s: %s - %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = [x, y]{ Int.sub(x, y) }
+                *Monkey.func(monkey) = Int.sub
             },
             { tryParseStr(line, "%s: %s * %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = [x, y]{ Int.mul(x, y) }
+                *Monkey.func(monkey) = Int.mul
             },
             { tryParseStr(line, "%s: %s / %s", Monkey.name(monkey), Monkey.op1(monkey), Monkey.op2(monkey)) }, {
-                *Monkey.func(monkey) = [x, y]{ Int.div(x, y) }
+                *Monkey.func(monkey) = Int.div
             },
             {
                 @valStr = 0;
