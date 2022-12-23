@@ -70,7 +70,24 @@
     })
 }();
 
-forRange(0, 10, [roundIdx]{
+@computeResult1 = {
+    @minX = 0 - 1;
+    @maxX = 0;
+    @minY = 0 - 1;
+    @maxY = 0;
+    Vector.forEach(elves, [pElf]{
+        @elf = *pElf;
+        minX = min(minX, *Elf.x(elf));
+        maxX = max(maxX, *Elf.x(elf));
+        minY = min(minY, *Elf.y(elf));
+        maxY = max(maxY, *Elf.y(elf))
+    });
+
+    (maxX - minX + 1) * (maxY - minY + 1) - Vector.size(elves)
+};
+
+@roundsDone = 0;
+runWhileTrue({
     Vector.forEach(elves, [pElf]{
         @elf = *pElf;
         @x = *Elf.x(elf);
@@ -105,7 +122,7 @@ forRange(0, 10, [roundIdx]{
                 })
             };
             forRangeWhileTrue(0, 4, [i]{
-                @j = (roundIdx + i) % 4;
+                @j = (roundsDone + i) % 4;
                 !ifChain(
                     { j == 0 }, { checkDirection(0, 0 - 1) },
                     { j == 1 }, { checkDirection(0, 1) },
@@ -124,33 +141,32 @@ forRange(0, 10, [roundIdx]{
         *Cell.proposalCount(cell) = *Cell.proposalCount(cell) + 1
     });
 
+    roundsDone = roundsDone + 1;
+
+    @elfMoved = 0;
     Vector.forEach(elves, [pElf]{
         @elf = *pElf;
-        @cell2 = getCell(*Elf.px(elf), *Elf.py(elf));
-        if(*Cell.proposalCount(cell2) == 1, {
-            @cell = getCell(*Elf.x(elf), *Elf.y(elf));
-            assert(*Cell.elf(cell) == elf);
-            *Cell.elf(cell) = 0;
-            *Cell.elf(cell2) = elf;
-            *Elf.x(elf) = *Elf.px(elf);
-            *Elf.y(elf) = *Elf.py(elf)
+        if(*Elf.x(elf) != *Elf.px(elf) || *Elf.y(elf) != *Elf.py(elf), {
+            @cell2 = getCell(*Elf.px(elf), *Elf.py(elf));
+            if(*Cell.proposalCount(cell2) == 1, {
+                elfMoved = 1;
+                @cell = getCell(*Elf.x(elf), *Elf.y(elf));
+                assert(*Cell.elf(cell) == elf);
+                *Cell.elf(cell) = 0;
+                *Cell.elf(cell2) = elf;
+                *Elf.x(elf) = *Elf.px(elf);
+                *Elf.y(elf) = *Elf.py(elf)
+            })
         })
-    })
+    });
+
+    if(roundsDone == 10, {
+        printL("%u", computeResult1())
+    });
+
+    elfMoved
 });
 
-@minX = 0 - 1;
-@maxX = 0;
-@minY = 0 - 1;
-@maxY = 0;
-Vector.forEach(elves, [pElf]{
-    @elf = *pElf;
-    minX = min(minX, *Elf.x(elf));
-    maxX = max(maxX, *Elf.x(elf));
-    minY = min(minY, *Elf.y(elf));
-    maxY = max(maxY, *Elf.y(elf))
-});
-
-@ret = (maxX - minX + 1) * (maxY - minY + 1) - Vector.size(elves);
-printL("%u", ret);
+printL("%u", roundsDone);
 
 0
