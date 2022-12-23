@@ -1,0 +1,156 @@
+@Elf.x = [elf]{ elf + 0 };
+@Elf.y = [elf]{ elf + 4 };
+@Elf.px = [elf]{ elf + 8 };
+@Elf.py = [elf]{ elf + 12 };
+@Elf.sizeof = 16;
+@Elf.init = {
+    @elf = brk;
+    brk = brk + Elf.sizeof;
+    elf
+};
+
+@elves = Vector.init(4);
+
+@Cell.x = [cell]{ cell + 0 };
+@Cell.y = [cell]{ cell + 4 };
+@Cell.elf = [cell]{ cell + 8 };
+@Cell.proposalCount = [cell]{ cell + 12 };
+@Cell.sizeof = 16;
+@Cell.init = {
+    @cell = brk;
+    brk = brk + Cell.sizeof;
+    cell
+};
+
+@cells = HashTable.init(16, [cell]{
+    combineHash(hashU32(*Cell.x(cell)), hashU32(*Cell.y(cell)))
+}, [cell1, cell2]{
+    *Cell.x(cell1) == *Cell.x(cell2) && *Cell.y(cell1) == *Cell.y(cell2)
+});
+
+@helperCell = Cell.init();
+@getCell = [x, y]{
+    *Cell.x(helperCell) = x;
+    *Cell.y(helperCell) = y;
+    @cell = HashTable.get(cells, helperCell);
+    if(cell == 0, {
+        cell = helperCell;
+        helperCell = Cell.init();
+        *Cell.elf(cell) = 0;
+        HashTable.add(cells, cell)
+    });
+    cell
+};
+
+{
+    @y = (0 - 1) / 2;
+    runWhileTrue({
+        y = y + 1;
+        @line = inputLine();
+        @x = (0 - 1) / 2;
+        ifElse0(get8(line), {
+            while({ get8(line) }, {
+                @ch = get8(line);
+                ifElse(ch == charNum("#"), {
+                    @elf = Elf.init();
+                    *Elf.x(elf) = x;
+                    *Elf.y(elf) = y;
+                    @cell = getCell(x, y);
+                    assert(*Cell.elf(cell) == 0);
+                    *Vector.push(elves) = elf;
+                    *Cell.elf(cell) = elf
+                }, {
+                    assert(ch == charNum("."))
+                });
+                x = x + 1;
+                line = line + 1
+            });
+            1
+        })
+    })
+}();
+
+forRange(0, 10, [roundIdx]{
+    Vector.forEach(elves, [pElf]{
+        @elf = *pElf;
+        @x = *Elf.x(elf);
+        @y = *Elf.y(elf);
+
+        @neighborsEmpty = 1;
+        @checkNeighbor = [dx, dy]{
+            @x2 = x + dx;
+            @y2 = y + dy;
+            @cell2 = getCell(x2, y2);
+            if(*Cell.elf(cell2) != 0, {
+                neighborsEmpty = 0
+            })
+        };
+        checkNeighbor(1, 1);
+        checkNeighbor(1, 0);
+        checkNeighbor(1, 0 - 1);
+        checkNeighbor(0, 0 - 1);
+        checkNeighbor(0 - 1, 0 - 1);
+        checkNeighbor(0 - 1, 0);
+        checkNeighbor(0 - 1, 1);
+        checkNeighbor(0, 1);
+
+        *Elf.px(elf) = x;
+        *Elf.py(elf) = y;
+        if(!neighborsEmpty, {
+            @checkDirection = [dx, dy]{
+                ifElse0(*Cell.elf(getCell(x + dx, y + dy)) == 0 && *Cell.elf(getCell(x + dx + dy, y + dy + dx)) == 0 && *Cell.elf(getCell(x + dx - dy, y + dy - dx)) == 0, {
+                    *Elf.px(elf) = x + dx;
+                    *Elf.py(elf) = y + dy;
+                    1
+                })
+            };
+            forRangeWhileTrue(0, 4, [i]{
+                @j = (roundIdx + i) % 4;
+                !ifChain(
+                    { j == 0 }, { checkDirection(0, 0 - 1) },
+                    { j == 1 }, { checkDirection(0, 1) },
+                    { j == 2 }, { checkDirection(0 - 1, 0) },
+                    { j == 3 }, { checkDirection(1, 0) },
+                    { assert(0) }
+                )
+            })
+        });
+        *Cell.proposalCount(getCell(*Elf.px(elf), *Elf.py(elf))) = 0
+    });
+
+    Vector.forEach(elves, [pElf]{
+        @elf = *pElf;
+        @cell = getCell(*Elf.px(elf), *Elf.py(elf));
+        *Cell.proposalCount(cell) = *Cell.proposalCount(cell) + 1
+    });
+
+    Vector.forEach(elves, [pElf]{
+        @elf = *pElf;
+        @cell2 = getCell(*Elf.px(elf), *Elf.py(elf));
+        if(*Cell.proposalCount(cell2) == 1, {
+            @cell = getCell(*Elf.x(elf), *Elf.y(elf));
+            assert(*Cell.elf(cell) == elf);
+            *Cell.elf(cell) = 0;
+            *Cell.elf(cell2) = elf;
+            *Elf.x(elf) = *Elf.px(elf);
+            *Elf.y(elf) = *Elf.py(elf)
+        })
+    })
+});
+
+@minX = 0 - 1;
+@maxX = 0;
+@minY = 0 - 1;
+@maxY = 0;
+Vector.forEach(elves, [pElf]{
+    @elf = *pElf;
+    minX = min(minX, *Elf.x(elf));
+    maxX = max(maxX, *Elf.x(elf));
+    minY = min(minY, *Elf.y(elf));
+    maxY = max(maxY, *Elf.y(elf))
+});
+
+@ret = (maxX - minX + 1) * (maxY - minY + 1) - Vector.size(elves);
+printL("%u", ret);
+
+0

@@ -1,0 +1,384 @@
+@lines = Vector.init(4);
+runWhileTrue({
+    @line = inputLine();
+    ifElse0(get8(line), {
+        *Vector.push(lines) = line
+    })
+});
+
+@w = 0;
+@h = Vector.size(lines);
+Vector.forEach(lines, [pLine]{
+    @line = *pLine;
+    w = max(w, strLen(line))
+});
+
+@board = Vector.init(4);
+forRange(0, w * h, [i]{
+    *Vector.push(board) = 0
+});
+forRange(0, h, [y]{
+    @x = 0;
+    @line = *Vector.item(lines, y);
+    while({ get8(line) }, {
+        @ch = get8(line);
+        *Vector.item(board, y * w + x) = ifChain(
+            { ch == charNum(" ") }, { 0 },
+            { ch == charNum(".") }, { 1 },
+            { ch == charNum("#") }, { 2 },
+            { assert(0) }
+        );
+        line = line + 1;
+        x = x + 1
+    })
+});
+
+@instructionStr = inputLine();
+
+@solve1 = {
+    @px = 0;
+    @py = 0;
+    @dir = 0;
+
+    while({ *Vector.item(board, px) != 1 }, {
+        px = px + 1;
+        assert(px < w)
+    });
+
+    @instructionStrLeft = instructionStr;
+
+    @visualize = {
+        printL("%u x %u, (%u, %u) -> %u: %s", w, h, px, py, dir, instructionStrLeft);
+        forRange(0, h, [y]{
+            forRange(0, w, [x]{
+                @val = *Vector.item(board, y * w + x);
+                print("%s", ifChain(
+                    { x == px && y == py }, {
+                        ifChain(
+                            { dir == 0 }, { ">" },
+                            { dir == 1 }, { "v" },
+                            { dir == 2 }, { "<" },
+                            { dir == 3 }, { "^" },
+                            { assert(0) }
+                        )
+                    },
+                    { val == 0 }, { " " },
+                    { val == 1 }, { "." },
+                    { val == 2 }, { "#" },
+                    { assert(0) }
+                ))
+            });
+            printL()
+        })
+    };
+    //visualize();
+
+    while({ get8(instructionStrLeft) }, {
+        @ch = get8(instructionStrLeft);
+        ifChain(
+            { charNum("0") <= ch <= charNum("9") }, {
+                @count = 0;
+                while({ charNum("0") <= ch <= charNum("9") }, {
+                    count = 10 * count + (ch - charNum("0"));
+                    instructionStrLeft = instructionStrLeft + 1;
+                    ch = get8(instructionStrLeft)
+                });
+                @dx = 0;
+                @dy = 0;
+                ifChain(
+                    { dir == 0 }, { dx = 1 },
+                    { dir == 1 }, { dy = 1 },
+                    { dir == 2 }, { dx = 0 - 1 },
+                    { dir == 3 }, { dy = 0 - 1 },
+                );
+                forRangeWhileTrue(0, count, [i]{
+                    @x = px + dx;
+                    @y = py + dy;
+                    if(x >= w || y >= h || *Vector.item(board, y * w + x) == 0, {
+                        @x2 = px;
+                        @y2 = py;
+                        while({ x2 < w && y2 < h && *Vector.item(board, y2 * w + x2) != 0 }, {
+                            x = x2;
+                            y = y2;
+                            x2 = x2 - dx;
+                            y2 = y2 - dy
+                        })
+                    });
+                    assert(x < w && y < h);
+                    ifElse0(*Vector.item(board, y * w + x) == 1, {
+                        px = x;
+                        py = y;
+                        1
+                    })
+                })
+            },
+            { ch == charNum("L") }, {
+                instructionStrLeft = instructionStrLeft + 1;
+                dir = (dir + 3) % 4
+            },
+            { ch == charNum("R") }, {
+                instructionStrLeft = instructionStrLeft + 1;
+                dir = (dir + 1) % 4
+            },
+            { assert(0) }
+        )
+        //;visualize()
+    });
+
+    1000 * (py + 1) + 4 * (px + 1) + dir
+};
+printL("%u", solve1());
+
+@solve2 = {
+    @Vec3.x = [v]{ v + 0 };
+    @Vec3.y = [v]{ v + 4 };
+    @Vec3.z = [v]{ v + 8 };
+    @Vec3.sizeof = 12;
+    @Vec3.init = {
+        @v = brk;
+        brk = brk + Vec3.sizeof;
+        v
+    };
+    @Vec3.initXYZ = [x, y, z]{
+        @v = Vec3.init();
+        *Vec3.x(v) = x;
+        *Vec3.y(v) = y;
+        *Vec3.z(v) = z;
+        v
+    };
+
+    @Vec3.eq = [a, b]{
+        *Vec3.x(a) == *Vec3.x(b) && *Vec3.y(a) == *Vec3.y(b) && *Vec3.z(a) == *Vec3.z(b)
+    };
+
+    @Vec3.hash = [v]{
+        @hash = 0;
+        hash = combineHash(hash, hashU32(*Vec3.x(v)));
+        hash = combineHash(hash, hashU32(*Vec3.y(v)));
+        hash = combineHash(hash, hashU32(*Vec3.z(v)));
+        hash
+    };
+
+    @Vec3.add = [a, b]{
+        Vec3.initXYZ(*Vec3.x(a) + *Vec3.x(b), *Vec3.y(a) + *Vec3.y(b), *Vec3.z(a) + *Vec3.z(b))
+    };
+    @Vec3.sub = [a, b]{
+        Vec3.initXYZ(*Vec3.x(a) - *Vec3.x(b), *Vec3.y(a) - *Vec3.y(b), *Vec3.z(a) - *Vec3.z(b))
+    };
+    @Vec3.scalarTimes = [coef, a]{
+        Vec3.initXYZ(coef * *Vec3.x(a), coef * *Vec3.y(a), coef * *Vec3.z(a))
+    };
+    @Vec3.cross = [a, b]{
+        Vec3.initXYZ(
+            *Vec3.y(a) * *Vec3.z(b) - *Vec3.z(a) * *Vec3.y(b),
+            *Vec3.z(a) * *Vec3.x(b) - *Vec3.x(a) * *Vec3.z(b),
+            *Vec3.x(a) * *Vec3.y(b) - *Vec3.y(a) * *Vec3.x(b)
+        )
+    };
+    @Vec3.neg = [v]{
+        Vec3.initXYZ(0 - *Vec3.x(v), 0 - *Vec3.y(v), 0 - *Vec3.z(v))
+    };
+
+    @Cell.pos = [cell]{ cell + 0 };
+    @Cell.normal = [cell]{ cell + 4 };
+    @Cell.val = [cell]{ cell + 8 };
+    @Cell.boardX = [cell]{ cell + 12 };
+    @Cell.boardY = [cell]{ cell + 16 };
+    @Cell.sizeof = 20;
+    @Cell.init = {
+        @cell = brk;
+        brk = brk + Cell.sizeof;
+        *Cell.pos(cell) = Vec3.init();
+        *Cell.normal(cell) = Vec3.init();
+        cell
+    };
+
+    @ht = HashTable.init(16, [cell]{
+        combineHash(Vec3.hash(*Cell.pos(cell)), Vec3.hash(*Cell.normal(cell)))
+    }, [cell1, cell2]{
+        Vec3.eq(*Cell.pos(cell1), *Cell.pos(cell2)) && Vec3.eq(*Cell.normal(cell1), *Cell.normal(cell2))
+    });
+
+    @side = ifElse(max(w, h) < 20, { 4 }, { 50 });
+
+    @dfs = [x, y, pos, right, down]{
+        @normal = Vec3.cross(right, down);
+        @cell = Cell.init();
+        *Cell.pos(cell) = pos;
+        *Cell.normal(cell) = normal;
+        *Cell.val(cell) = *Vector.item(board, y * w + x);
+        *Cell.boardX(cell) = x;
+        *Cell.boardY(cell) = y;
+        @entry = HashTable.get(ht, cell);
+        if(entry == 0, {
+            //printL("x = %u, y = %u, cell = (pos = (%u, %u, %u), normal = (%u, %u, %u)), right = (%u, %u, %u), down = (%u, %u, %u)", x, y, *Vec3.x(*Cell.pos(cell)), *Vec3.y(*Cell.pos(cell)), *Vec3.z(*Cell.pos(cell)), *Vec3.x(*Cell.normal(cell)), *Vec3.y(*Cell.normal(cell)), *Vec3.z(*Cell.normal(cell)), *Vec3.x(right), *Vec3.y(right), *Vec3.z(right), *Vec3.x(down), *Vec3.y(down), *Vec3.z(down));
+            HashTable.add(ht, cell);
+            @consider = [dx, dy]{
+                @x2 = x + dx;
+                @y2 = y + dy;
+                if(x2 < w && y2 < h && *Vector.item(board, y2 * w + x2) != 0, {
+                    @movedPos = Vec3.add(Vec3.add(pos, Vec3.scalarTimes(dx, right)), Vec3.scalarTimes(dy, down));
+
+                    @cell2 = Cell.init();
+
+                    @newRight = right;
+                    @newDown = down;
+                    @newPos = movedPos;
+
+                    if(!(0 <= *Vec3.x(movedPos) < side && 0 <= *Vec3.y(movedPos) < side && 0 <= *Vec3.z(movedPos) < side), {
+                        newPos = pos;
+
+                        ifElse(dx, {
+                            newRight = ifElse(dx == 1, { Vec3.neg(normal) }, { normal })
+                        }, {
+                            newDown = ifElse(dy == 1, { Vec3.neg(normal) }, { normal })
+                        })
+                    });
+
+                    dfs(x2, y2, newPos, newRight, newDown)
+                })
+            };
+            consider(1, 0);
+            consider(0 - 1, 0);
+            consider(0, 1);
+            consider(0, 0 - 1)
+        })
+    };
+
+    @sx = 0;
+    @sy = 0;
+    while({ *Vector.item(board, sx) != 1 }, {
+        sx = sx + 1;
+        assert(sx < w)
+    });
+
+    dfs(sx, sy, Vec3.initXYZ(0, side - 1, 0), Vec3.initXYZ(1, 0, 0), Vec3.initXYZ(0, 0 - 1, 0));
+
+    @getCellHelperCell = Cell.init();
+    @getCell = [pos, normal]{
+        *Cell.pos(getCellHelperCell) = pos;
+        *Cell.normal(getCellHelperCell) = normal;
+        HashTable.get(ht, getCellHelperCell)
+    };
+
+    @pos = Vec3.initXYZ(0, side - 1, 0);
+    @dir = Vec3.initXYZ(1, 0, 0);
+    @normal = Vec3.initXYZ(0, 0, 0 - 1);
+    assert(getCell(pos, normal) != 0);
+
+    @getDirIdx = {
+        @cell = getCell(pos, normal);
+        assert(cell != 0);
+        @pos2 = Vec3.add(pos, dir);
+        @negate = ifElse(0 <= *Vec3.x(pos2) < side && 0 <= *Vec3.y(pos2) < side && 0 <= *Vec3.z(pos2) < side, {
+            0
+        }, {
+            pos2 = Vec3.sub(pos, dir);
+            1
+        });
+        @cell2 = getCell(pos2, normal);
+        assert(cell2 != 0);
+        @dx = *Cell.boardX(cell2) - *Cell.boardX(cell);
+        @dy = *Cell.boardY(cell2) - *Cell.boardY(cell);
+        if(negate, {
+            dx = 0 - dx;
+            dy = 0 - dy
+        });
+        ifChain(
+            { dx == 1 && dy == 0 }, { 0 },
+            { dx == 0 && dy == 1 }, { 1 },
+            { dx == 0 - 1 && dy == 0 }, { 2 },
+            { dx == 0 && dy == 0 - 1 }, { 3 },
+            { assert(0, "Could not recognize direction when dx = %u, dy = %u", dx, dy) }
+        )
+    };
+
+    @instructionStrLeft = instructionStr;
+
+    @visualize = {
+        @cell = getCell(pos, normal);
+        assert(cell != 0);
+        @px = *Cell.boardX(cell);
+        @py = *Cell.boardY(cell);
+        @dirIdx = getDirIdx();
+        printL("%u x %u, (%u, %u) -> %u: %s", w, h, px, py, dirIdx, instructionStrLeft);
+        forRange(0, h, [y]{
+            forRange(0, w, [x]{
+                @val = *Vector.item(board, y * w + x);
+                print("%s", ifChain(
+                    { x == px && y == py }, {
+                        ifChain(
+                            { dirIdx == 0 }, { ">" },
+                            { dirIdx == 1 }, { "v" },
+                            { dirIdx == 2 }, { "<" },
+                            { dirIdx == 3 }, { "^" },
+                            { assert(0) }
+                        )
+                    },
+                    { val == 0 }, { " " },
+                    { val == 1 }, { "." },
+                    { val == 2 }, { "#" },
+                    { assert(0) }
+                ))
+            });
+            printL()
+        })
+    };
+    //visualize();
+
+    while({ get8(instructionStrLeft) }, {
+        @cell = getCell(pos, normal);
+        @ch = get8(instructionStrLeft);
+        ifChain(
+            { charNum("0") <= ch <= charNum("9") }, {
+                @count = 0;
+                while({ charNum("0") <= ch <= charNum("9") }, {
+                    count = 10 * count + (ch - charNum("0"));
+                    instructionStrLeft = instructionStrLeft + 1;
+                    ch = get8(instructionStrLeft)
+                });
+                forRangeWhileTrue(0, count, [i]{
+                    @pos2 = Vec3.add(pos, dir);
+                    @normal2 = normal;
+                    @dir2 = dir;
+                    if(!(0 <= *Vec3.x(pos2) < side && 0 <= *Vec3.y(pos2) < side && 0 <= *Vec3.z(pos2) < side), {
+                        pos2 = pos;
+                        normal2 = dir;
+                        dir2 = Vec3.neg(normal)
+                    });
+                    @cell2 = getCell(pos2, normal2);
+                    assert(cell2 != 0, "Walked to unknown cell");
+                    @val2 = *Cell.val(cell2);
+                    ifChain(
+                        { val2 == 1 }, {
+                            pos = pos2;
+                            normal = normal2;
+                            dir = dir2;
+                            1
+                        },
+                        { val2 == 2 }, {
+                            0
+                        },
+                        { assert(0, "Invalid cell value %u", val2) }
+                    )
+                })
+            },
+            { ch == charNum("L") }, {
+                instructionStrLeft = instructionStrLeft + 1;
+                dir = Vec3.cross(dir, *Cell.normal(cell))
+            },
+            { ch == charNum("R") }, {
+                instructionStrLeft = instructionStrLeft + 1;
+                dir = Vec3.cross(*Cell.normal(cell), dir)
+            },
+            { assert(0, "Invalid command") }
+        )
+        //;visualize()
+    });
+
+    @cell = getCell(pos, normal);
+    1000 * (*Cell.boardY(cell) + 1) + 4 * (*Cell.boardX(cell) + 1) + getDirIdx()
+};
+printL("%u", solve2());
+
+0
