@@ -1,0 +1,146 @@
+@lines = Vector.init(4);
+runWhileTrue({
+    @line = inputLine();
+    ifElse0(get8(line), {
+        *Vector.push(lines) = line;
+        1
+    })
+});
+
+@Blizzard.x = [blizzard]{ blizzard + 0 };
+@Blizzard.y = [blizzard]{ blizzard + 4 };
+@Blizzard.dx = [blizzard]{ blizzard + 8 };
+@Blizzard.dy = [blizzard]{ blizzard + 12 };
+@Blizzard.sizeof = 16;
+
+assert(Vector.size(lines) > 0);
+assert(strLen(*Vector.item(lines, 0)) > 0);
+@w = strLen(*Vector.item(lines, 0)) - 2;
+@h = Vector.size(lines) - 2;
+
+@xBlizzards = Vector.init(4);
+@yBlizzards = Vector.init(4);
+forRange(0, h, [y]{
+    *Vector.push(xBlizzards) = Vector.init(Blizzard.sizeof)
+});
+forRange(0, w, [x]{
+    *Vector.push(yBlizzards) = Vector.init(Blizzard.sizeof)
+});
+
+forRange(0, h + 2, [iy]{
+    @line = *Vector.item(lines, iy);
+    assert(strLen(line) == w + 2);
+    forRange(0, w + 2, [ix]{
+        @ch = get8(line + ix);
+        ifElse(0 < ix <= w && 0 < iy <= h, {
+            if(ch != charNum("."), {
+                @x = ix - 1;
+                @y = iy - 1;
+                @dx = 0;
+                @dy = 0;
+                ifChain(
+                    { ch == charNum("^") }, { dy = 0 - 1 },
+                    { ch == charNum("v") }, { dy = 1 },
+                    { ch == charNum("<") }, { dx = 0 - 1 },
+                    { ch == charNum(">") }, { dx = 1 },
+                    { assert(0) }
+                );
+
+                @blizzard = ifElse(dx == 0, {
+                    Vector.push(*Vector.item(yBlizzards, x))
+                }, {
+                    Vector.push(*Vector.item(xBlizzards, y))
+                });
+
+                *Blizzard.x(blizzard) = x;
+                *Blizzard.y(blizzard) = y;
+                *Blizzard.dx(blizzard) = dx;
+                *Blizzard.dy(blizzard) = dy
+            })
+        }, {
+            @expectedCh = charNum(ifElse((iy == 0 && ix == 1) || (iy == h + 1 && ix == w), { "." }, { "#" }));
+            assert(ch == expectedCh, "Unexpected character at (%u, %u): expected '%s', got '%s'", ix, iy, &expectedCh, &ch)
+        })
+    })
+});
+
+@hasBlizzard = [x, y, t]{
+    @check = [blizzard]{
+        @bx = *Blizzard.x(blizzard) + *Blizzard.dx(blizzard) * t;
+        @by = *Blizzard.y(blizzard) + *Blizzard.dy(blizzard) * t;
+        bx = ifElse(bx < #80000000, { bx % w }, { (w - (0 - bx) % w) % w });
+        by = ifElse(by < #80000000, { by % h }, { (h - (0 - by) % h) % h });
+        x != bx || y != by
+    };
+    !runArgsWhileTrue(
+        {
+            @blizzards = *Vector.item(xBlizzards, y);
+            forRangeWhileTrue(0, Vector.size(blizzards), [i]{
+                check(Vector.item(blizzards, i))
+            })
+        },
+        {
+            @blizzards = *Vector.item(yBlizzards, x);
+            forRangeWhileTrue(0, Vector.size(blizzards), [i]{
+                check(Vector.item(blizzards, i))
+            })
+        }
+    )
+};
+
+@State.x = [state]{ state + 0 };
+@State.y = [state]{ state + 4 };
+@State.t = [state]{ state + 8 };
+@State.sizeof = 12;
+@State.init = {
+    @state = brk;
+    brk = brk + State.sizeof;
+    state
+};
+
+@State.hash = [state]{
+    @hash = 0;
+    hash = combineHash(hash, hashU32(*State.x(state)));
+    hash = combineHash(hash, hashU32(*State.y(state)));
+    hash = combineHash(hash, hashU32(*State.t(state)));
+    hash
+};
+@State.eq = [state1, state2]{
+    *State.x(state1) == *State.x(state2) && *State.y(state1) == *State.y(state2) && *State.t(state1) == *State.t(state2)
+};
+
+@initState = State.init();
+*State.x(initState) = 0;
+*State.y(initState) = 0 - 1;
+*State.t(initState) = 0;
+
+@isEndState = [state]{
+    *State.x(state) == w - 1 && *State.y(state) == h - 1
+};
+@neighborGen = [state, callback]{
+    @consider = [dx, dy]{
+        @x2 = *State.x(state) + dx;
+        @y2 = *State.y(state) + dy;
+        @t2 = *State.t(state) + 1;
+        if((x2 < w && y2 < h && !hasBlizzard(x2, y2, t2)) || (dx == 0 && dy == 0 && x2 == 0 && y2 == 0 - 1), {
+            @state2 = State.init();
+            *State.x(state2) = x2;
+            *State.y(state2) = y2;
+            *State.t(state2) = t2;
+            callback(state2, 1)
+        })
+    };
+    consider(0, 0);
+    consider(0 - 1, 0);
+    consider(1, 0);
+    consider(0, 0 - 1);
+    consider(0, 1)
+};
+@heuristic = [state]{
+    absDiff(*State.x(state), w - 1) + absDiff(*State.y(state) + 1, h)
+};
+
+@ret1 = aStar(initState, HashTable.init(20, { 0 }, { 0 }), isEndState, neighborGen, heuristic, State.hash, State.eq) + 1;
+printL("%u", ret1);
+
+0
