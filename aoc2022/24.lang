@@ -109,38 +109,45 @@ forRange(0, h + 2, [iy]{
     *State.x(state1) == *State.x(state2) && *State.y(state1) == *State.y(state2) && *State.t(state1) == *State.t(state2)
 };
 
-@initState = State.init();
-*State.x(initState) = 0;
-*State.y(initState) = 0 - 1;
-*State.t(initState) = 0;
+@hashtable = HashTable.init(20, { 0 }, { 0 });
 
-@isEndState = [state]{
-    *State.x(state) == w - 1 && *State.y(state) == h - 1
-};
-@neighborGen = [state, callback]{
-    @consider = [dx, dy]{
-        @x2 = *State.x(state) + dx;
-        @y2 = *State.y(state) + dy;
-        @t2 = *State.t(state) + 1;
-        if((x2 < w && y2 < h && !hasBlizzard(x2, y2, t2)) || (dx == 0 && dy == 0 && x2 == 0 && y2 == 0 - 1), {
-            @state2 = State.init();
-            *State.x(state2) = x2;
-            *State.y(state2) = y2;
-            *State.t(state2) = t2;
-            callback(state2, 1)
-        })
+@solve = [startX, startY, startT, endX, endY]{
+    @initState = State.init();
+    *State.x(initState) = startX;
+    *State.y(initState) = startY;
+    *State.t(initState) = startT;
+
+    @isEndState = [state]{
+        *State.x(state) == endX && *State.y(state) == endY
     };
-    consider(0, 0);
-    consider(0 - 1, 0);
-    consider(1, 0);
-    consider(0, 0 - 1);
-    consider(0, 1)
-};
-@heuristic = [state]{
-    absDiff(*State.x(state), w - 1) + absDiff(*State.y(state) + 1, h)
-};
+    @neighborGen = [state, callback]{
+        @consider = [dx, dy]{
+            @x2 = *State.x(state) + dx;
+            @y2 = *State.y(state) + dy;
+            @t2 = *State.t(state) + 1;
+            if((x2 < w && y2 < h && !hasBlizzard(x2, y2, t2)) || (x2 == 0 && y2 == 0 - 1) || (x2 == w - 1 && y2 == h), {
+                @state2 = State.init();
+                *State.x(state2) = x2;
+                *State.y(state2) = y2;
+                *State.t(state2) = t2;
+                callback(state2, 1)
+            })
+        };
+        consider(0, 0);
+        consider(0 - 1, 0);
+        consider(1, 0);
+        consider(0, 0 - 1);
+        consider(0, 1)
+    };
+    @heuristic = [state]{
+        absDiff(*State.x(state), w - 1) + absDiff(*State.y(state) + 1, h)
+    };
 
-@ret1 = aStar(initState, HashTable.init(20, { 0 }, { 0 }), isEndState, neighborGen, heuristic, State.hash, State.eq) + 1;
+    startT + aStar(initState, hashtable, isEndState, neighborGen, heuristic, State.hash, State.eq)
+};
+@ret1 = solve(0, 0 - 1, 0, w - 1, h);
 printL("%u", ret1);
+@ret2 = solve(0, 0 - 1, solve(w - 1, h, ret1, 0, 0 - 1), w - 1, h);
+printL("%u", ret2);
 
 0
