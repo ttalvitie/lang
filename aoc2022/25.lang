@@ -1,0 +1,59 @@
+@parseSnafu = [str]{
+    @ret = SInt.init(0);
+    while({ get8(str) }, {
+        @ch = get8(str);
+        str = str + 1;
+        @d = ifChain(
+            { ch == charNum("2") }, { SInt.init(2) },
+            { ch == charNum("1") }, { SInt.init(1) },
+            { ch == charNum("0") }, { SInt.init(0) },
+            { ch == charNum("-") }, { SInt.neg(SInt.init(1)) },
+            { ch == charNum("=") }, { SInt.neg(SInt.init(2)) },
+            { assert(0) }
+        );
+        ret = SInt.add(SInt.mul(SInt.init(5), ret), d)
+    });
+    ret
+};
+
+@toSnafu = [val]{
+    @ret = 0;
+    @recursion = [left]{
+        @d = SInt.rem(left, SInt.init(5));
+        if(SInt.gt(d, SInt.init(2)), {
+            d = SInt.sub(d, SInt.init(5))
+        });
+        @digit = charNum(ifChain(
+            { SInt.eq(d, SInt.init(2)) }, { "2" },
+            { SInt.eq(d, SInt.init(1)) }, { "1" },
+            { SInt.eq(d, SInt.init(0)) }, { "0" },
+            { SInt.eq(d, SInt.neg(SInt.init(1))) }, { "-" },
+            { SInt.eq(d, SInt.neg(SInt.init(2))) }, { "=" },
+            { assert(0) }
+        ));
+        left = SInt.div(SInt.sub(left, d), SInt.init(5));
+        ifElse(SInt.eq(left, SInt.init(0)), {
+            ret = brk
+        }, {
+            recursion(left)
+        });
+        put8(brk, digit);
+        brk = brk + 1
+    };
+    recursion(val);
+    put8(brk, 0);
+    brk = brk + 1;
+    ret
+};
+
+@ret1 = SInt.init(0);
+runWhileTrue({
+    @line = inputLine();
+    ifElse0(get8(line), {
+        ret1 = SInt.add(ret1, parseSnafu(line))
+    })
+});
+
+printL("%s", toSnafu(ret1));
+
+0
